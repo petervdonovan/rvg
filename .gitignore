@@ -2,3 +2,4 @@ _build/
 *.opam
 **/temp.*
 **/temp/
+_opam/

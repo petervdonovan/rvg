@@ -26,79 +26,87 @@ let isWhitespace char = List.mem char [' '; '\n'; '\t'; '\r']
 let rec consumeWhitespace stream =
   let char = Seq.uncons stream in
     match char with
-    | Some (c, _) -> if isWhitespace c then consumeWhitespace stream else Some (String.make 1 c)
+    | Some (c, s) -> if isWhitespace c then consumeWhitespace s else Some (c, s)
     | None -> None
 let rec parseTokenRec stream current =
   let char = Seq.uncons stream in
     match char with
-    | Some (c, _) ->
-      if isWhitespace c then Some current else parseTokenRec stream (current ^ String.make 1 c)
-    | None -> if current == "" then None else Some current
+    | Some (c, s) ->
+      if isWhitespace c
+        then Some (current, s)
+      else if List.mem c ['[';']';'(';')']
+        then if current = ""
+          then Some (String.make 1 c, s)
+          else Some (current, Seq.cons c s)
+      else parseTokenRec s (current ^ String.make 1 c)
+    | None -> if current = "" then None else Some (current, stream)
 let parseToken stream =
   match consumeWhitespace stream with
-    | Some c -> parseTokenRec stream c
+    | Some (c, s) -> parseTokenRec (Seq.cons c s) ""
     | None -> None
 
-let rec parseTopLevel stream acc =
-  let s = Seq.of_dispenser (fun () -> (
-    try Some (input_char stream) with
-      End_of_file -> None
-  )) in
-    let char = Seq.uncons s in
-      match char with
-      | Some ('[', _) -> List.cons (parseList s) acc
-      | Some (x, _) -> raise (ParseFail ("Expected '[', not " ^ String.make 1 x))
-      | None -> acc
-and parseList stream : expr =
+let inputChannelToSeq ic = Seq.of_dispenser (fun () -> (
+  try Some (input_char ic) with
+    End_of_file -> None
+  ))
+
+
+let rec parseTopLevel s acc =
+  let char = Seq.uncons s in
+    match char with
+    | Some ('[', s') -> List.cons (parseList s') acc
+    | Some (x, _) -> raise (ParseFail ("Expected '[', not " ^ String.make 1 x))
+    | None -> acc
+and parseList stream =
   let token = parseToken stream in
     match token with
-    | Some "lam" -> parseLam stream
-    | Some t -> parseLamApplication t stream
+    | Some ("lam", s) -> parseLam s
+    | Some (t, s) -> parseLamApplication t s
     | None -> raise (ParseFail "Trailing '['")
 and parseLam stream =
   let char = consumeWhitespace stream in
-    let p = (
-      match char with
-      | Some "[" -> parseVarList stream []
+    match char with
+      | Some ('[', s) -> let p, s' = parseVarList s [] in
+        let value, s'' = parseExpr s' in Lam { params = p; value = value }, s''
       | _ -> raise (ParseFail "expected '['")
-     ) in
-      Lam { params = p; value = parseExpr stream }
 and parseVar stream =
   let name = parseToken stream in
     match name with
-    | Some ")" -> raise (ParseFail "Expected name, not ')'")
-    | Some n -> let checks = parseChecks stream in { name = n; checks = checks }
+    | Some (")", _) -> raise (ParseFail "Expected name, not ')'")
+    | Some (n, s) -> let checks = parseChecks s in { name = n; checks = checks }
     | None -> raise (ParseFail "Expected name, not end-of-file")
 
-and parseTemplate stream = [Asm (parseAsm stream)]
-and parseAsm stream = let asm = Seq.take_while (fun c -> c != '}') stream in
-  Seq.fold_left (fun s c -> s ^ (String.make 1 c)) "" asm
-  (* let char = input_char stream in
-    if char = '}' then acc else acc ^ (String.make 1 char) *)
+and parseTemplate stream = let asm, s = parseAsm stream in [Asm asm], s
+and parseAsm stream =
+  let pred = fun c -> c != '}' in
+    let asm = Seq.take_while pred stream in
+    (Seq.fold_left (fun s c -> s ^ (String.make 1 c)) "" asm), Seq.drop_while pred stream
 and parseExpr stream = let token = parseToken stream in
   match token with
-  | Some "{" -> Template (parseTemplate stream)
-  | Some "[" -> parseList stream
+  | Some ("{", s) -> let template, s = parseTemplate s in Template template, s
+  | Some ("[", s) -> parseList s
   | None -> raise (ParseFail "Expected expression, not end-of-file")
-  | Some t -> Name t
+  | Some (t, _) -> Name t, stream
 and parseChecks _ = []
-and parseLamApplication token stream = LamApplication {
-  lam = if token = "[" then parseList stream else Name token;
-  args = parseArgs stream []
-}
+and parseLamApplication token stream =
+  let lam, s' = if token = "[" then parseList stream else Name token, stream in
+    let args, s'' = parseArgs s' [] in
+    LamApplication { lam = lam; args = args }, s''
 and parseArgs stream accumulator =
   let token = parseToken stream in
   match token with
-  | Some "]" -> accumulator
-  | Some t -> parseArgs stream (Name t :: accumulator)
+  | Some ("]", _) -> accumulator, stream
+  | Some (t, s) -> parseArgs s (Name t :: accumulator)
   | None -> raise (ParseFail "Expected arg or ']', not end-of-file")
 and parseVarList stream accumulator =
   let c = consumeWhitespace stream in
   match c with
-  | Some "]" -> accumulator
-  | Some "(" -> parseVarList stream ((parseVar stream) :: accumulator)
-  | Some x -> raise (ParseFail ("Expected ']' or '(', not " ^ x))
+  | Some (']', s) -> accumulator, s
+  | Some ('(', s) -> parseVarList s ((parseVar s) :: accumulator)
+  | Some (x, _) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x))
   | None -> raise (ParseFail "Expected ']' or '(', not end-of-file")
+
+let parseFile ic = parseTopLevel (inputChannelToSeq ic) []
 
 let rec exprToString (e: expr): string = match e with
   | Name s -> "Name(" ^ s ^ ")"
@@ -112,5 +120,13 @@ let rec exprToString (e: expr): string = match e with
     ^ ")"
   | LamApplication { lam; args } -> "LamApplication(" ^
     exprToString lam ^ ", "
-    ^ List.fold_left (^) "" (List.map exprToString args)
+    ^ List.fold_left (fun a b -> a ^ ", " ^ b) "" (List.map exprToString args)
     ^ ")"
+
+let%expect_test _ =
+  List.iter print_endline (List.map exprToString (
+    List.map fst
+    ( parseTopLevel (String.to_seq "[lam [] \"\" ]") [] )
+  ));
+  [%expect{| Lam(params=[], value=Name("")) |}]
+

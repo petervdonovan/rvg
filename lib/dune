@@ -1,3 +1,5 @@
 (library
  (name rvg)
- (modules Ast))
+ (modules Ast)
+ (inline_tests)
+ (preprocess (pps ppx_inline_test ppx_expect)))

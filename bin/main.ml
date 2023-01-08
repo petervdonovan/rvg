@@ -1,4 +1,4 @@
-let file = "example.dat"
+let file = "temp.dat"
 
 let () =
 
@@ -6,7 +6,10 @@ let () =
   let ic = open_in file in
   try
     print_newline ();
-    print_string (List.fold_left (^) "" (List.map Rvg.Ast.exprToString (Rvg.Ast.parseTopLevel ic [])));
+    List.iter print_endline (List.map Rvg.Ast.exprToString (
+      List.map fst
+      ( Rvg.Ast.parseTopLevel (String.to_seq "[lam [] \"\" ]") [] )
+    ));
     print_newline ();
   with e ->
     (* some unexpected exception occurs *)
