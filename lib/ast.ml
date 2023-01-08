@@ -66,8 +66,16 @@ and parseList stream =
 and parseLam stream =
   let char = consumeWhitespace stream in
     match char with
-      | Some ('[', s) -> let p, s' = parseVarList s [] in
-        let value, s'' = parseExpr s' in Lam { params = p; value = value }, s''
+      | Some ('[', s) ->
+        let p, s' = parseVarList s [] in
+          let value, s'' = parseExpr s' in (
+            Lam { params = p; value = value },
+            let t = parseToken s'' in
+              match t with
+              | Some ("]", s''') -> s'''
+              | Some (tok, _) -> raise (ParseFail ("Expected \"]\" to close lam expression, but got " ^ tok ^ " instead"))
+              | None -> raise (ParseFail "Unexpected end of file before close of lam expression")
+          )
       | _ -> raise (ParseFail "expected '['")
 and parseVar stream =
   let name = parseToken stream in
@@ -86,17 +94,20 @@ and parseExpr stream = let token = parseToken stream in
   | Some ("{", s) -> let template, s = parseTemplate s in Template template, s
   | Some ("[", s) -> parseList s
   | None -> raise (ParseFail "Expected expression, not end-of-file")
-  | Some (t, _) -> Name t, stream
+  | Some (t, s) -> Name t, s
 and parseChecks _ = []
 and parseLamApplication token stream =
   let lam, s' = if token = "[" then parseList stream else Name token, stream in
     let args, s'' = parseArgs s' [] in
-    LamApplication { lam = lam; args = args }, s''
+    LamApplication { lam = lam; args = List.rev args }, s''
+
 and parseArgs stream accumulator =
   let token = parseToken stream in
   match token with
-  | Some ("]", _) -> accumulator, stream
-  | Some (t, s) -> parseArgs s (Name t :: accumulator)
+  | Some ("]", s) -> accumulator, s
+  | Some (t, s) ->
+    let nextExpr, s' = if t <> "[" then Name t, s else parseList s
+    in parseArgs s' (nextExpr :: accumulator)
   | None -> raise (ParseFail "Expected arg or ']', not end-of-file")
 and parseVarList stream accumulator =
   let c = consumeWhitespace stream in
@@ -120,13 +131,27 @@ let rec exprToString (e: expr): string = match e with
     ^ ")"
   | LamApplication { lam; args } -> "LamApplication(" ^
     exprToString lam ^ ", "
-    ^ List.fold_left (fun a b -> a ^ ", " ^ b) "" (List.map exprToString args)
+    ^ String.concat ", " (List.map exprToString args)
     ^ ")"
 
+let printAst text: unit = List.iter print_endline (List.map exprToString (
+  List.map fst
+  ( parseTopLevel (String.to_seq text) [] )
+))
+
 let%expect_test _ =
-  List.iter print_endline (List.map exprToString (
-    List.map fst
-    ( parseTopLevel (String.to_seq "[lam [] \"\" ]") [] )
-  ));
+  printAst "[lam [] \"\" ]";
   [%expect{| Lam(params=[], value=Name("")) |}]
+
+let%expect_test _ =
+  printAst "[a [lam [] \"test0\"] \"test1\" ]";
+  [%expect{| LamApplication(Name(a), Lam(params=[], value=Name("test0")), Name("test1")) |}]
+
+let%expect_test _ =
+  printAst "[a [lam [] [lam [] \"test0\"]] \"test1\" ]";
+  [%expect{| LamApplication(Name(a), Lam(params=[], value=Lam(params=[], value=Name("test0"))), Name("test1")) |}]
+
+let%expect_test _ =
+  printAst "[[lam [] \"test2\"] \"test3\" ]";
+  [%expect{| LamApplication(Lam(params=[], value=Name("test2")), Name("test3")) |}]
 
