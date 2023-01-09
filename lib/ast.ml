@@ -23,7 +23,6 @@ and lam_application = {
   args: expr list
 }
 
-
 let rec exprToString (e: expr): string = match e with
   | Name s -> "Name(" ^ s ^ ")"
   | Var { name; _ } -> "Var(name=" ^ name ^ ")"
