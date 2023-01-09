@@ -7,8 +7,7 @@ let () =
   try
     print_newline ();
     List.iter print_endline (List.map Rvg.Ast.exprToString (
-      List.map fst
-      ( Rvg.Ast.parseTopLevel (String.to_seq "[lam [] \"\" ]") [] )
+      ( Rvg.Ast.parseTopLevel [] (String.to_seq "[lam [] \"\" ]"))
     ));
     print_newline ();
   with e ->
