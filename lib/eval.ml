@@ -21,20 +21,8 @@ let rec evalExpr env e = match e with
     "A parameter is not an expression, but tried to evaluate "
     ^ (Ast.exprToString (Ast.Var v))))
   | Ast.Asm asm -> Ast.Asm asm, env
-  | Ast.Template tem ->
-    let flattened = List.map (
-        fun e -> match e with
-          | Ast.Template exprs -> exprs
-          | _ -> [e]
-      ) tem |> List.concat
-    in
-      let exprs', env' = evalExprListInOrder env flattened
+  | Ast.Template tem -> let exprs', env' = evalExprListInOrder env tem
         in Ast.Template exprs', env'
-  (* | Ast.Template tem -> Ast.Template (List.map evalExpr env (List.concat (
-      fun e -> match e with
-      | Ast.Template exprs -> exprs
-      | _ -> [e]
-    ) tem)) *)
   | Ast.Lam lam -> Ast.Lam lam, env
   | Ast.LamApplication { lam; args } ->
     let lam', env' = evalExpr env lam in
@@ -42,10 +30,13 @@ let rec evalExpr env e = match e with
         match lam' with
         | Lam { params; value; env } -> evalExpr (bindNames env params args') value
         | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e))
-and evalExprListInOrder env exprList = List.fold_left (
-  fun (exprs, env) expr ->
-    let expr', env' = evalExpr env expr in
-      expr' :: exprs, env') ([], env) exprList
+and evalExprListInOrder env exprList =
+  let exprs, env = List.fold_left
+    ( fun (exprs, env) expr ->
+      let expr', env' = evalExpr env expr in
+        expr' :: exprs, env'
+    ) ([], env) exprList
+  in List.rev exprs, env
 
 let evalProgram exprs = exprs |> evalExprListInOrder Environment.empty |> fst
 
@@ -57,7 +48,10 @@ let%expect_test _ = printReducedAst "[lam [] \"\" ]";
   [%expect{| Lam(params=[], value=Name("")) |}]
 
 let%expect_test _ = printReducedAst "[[lam [] {}]]";
-  [%expect{| Template(Asm()) |}]
+  [%expect{| Template() |}]
 
 let%expect_test _ = printReducedAst "[[lam [(x)] {}] {} ]";
-  [%expect{| Template(Asm()) |}]
+  [%expect{| Template() |}]
+
+let%expect_test _ = printReducedAst "[[lam [(x)] { [[lam [(x)] {y}] {}] x }] { alphabet }]";
+  [%expect {| Template(Asm( )Template(Asm(y))Asm( x )) |}]

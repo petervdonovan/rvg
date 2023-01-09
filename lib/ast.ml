@@ -92,12 +92,21 @@ and parseVar stream =
       )
     | None -> raise (ParseFail "Expected name, not end-of-file")
 
-and parseTemplate stream = let asm, s = parseAsm stream in [Asm asm], s
+and parseTemplate stream = let asm, s = parseAsm stream in
+  if asm <> "" then let rest, s' = parseTemplate s in
+    List.cons (Asm asm) rest, s'
+  else match parseToken s with
+  | Some ("}", s') -> [], s'
+  | Some ("[", s') -> let e, s'' = parseList s' in
+    let rest, s''' = parseTemplate s'' in
+      List.cons e rest, s'''
+  | Some _ -> raise (ParseFail "This should be unreachable")
+  | None -> raise (ParseFail "Unexpected end-of-file before close of template")
 and parseAsm stream =
-  let pred = fun c -> c != '}' in
+  let pred = fun c -> not (List.mem c ['}';'[']) in
     let asm = Seq.take_while pred stream in
       (Seq.fold_left (fun s c -> s ^ (String.make 1 c)) "" asm),
-      Seq.drop 1 (Seq.drop_while pred stream)
+      Seq.drop_while pred stream
 and parseExpr stream = let token = parseToken stream in
   match token with
   | Some ("{", s) -> let template, s = parseTemplate s in Template template, s
@@ -167,7 +176,7 @@ let%expect_test _ =
 
 let%expect_test _ =
   printAst "[f alpha {}]";
-  [%expect {| LamApplication(lam=Name(f), args=(Name(alpha), Template(Asm()))) |}]
+  [%expect {| LamApplication(lam=Name(f), args=(Name(alpha), Template())) |}]
 
 let%expect_test _ = printAst "[[lam [(x)] {}] {} ]";
-  [%expect{| LamApplication(lam=Lam(params=[Var(name=x)], value=Template(Asm())), args=(Template(Asm()))) |}]
+  [%expect{| LamApplication(lam=Lam(params=[Var(name=x)], value=Template()), args=(Template())) |}]
