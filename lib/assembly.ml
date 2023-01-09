@@ -29,7 +29,7 @@ type t = { top: string; middle: instruction list; bottom: string }
 
 module NameSet = Set.Make(String)
 let strsToNameset strs = List.fold_right NameSet.add strs NameSet.empty
-let rTypeInstrs: NameSet.t = strsToNameset ["add"; "sub"; "and"; "or"; "xor"; "sll"; "srl"; "sra"; "slt"; "sltu"; "addi"; "andi"; "ori"; "xori"; "slli"; "srli"; "srai"; "slti"; "sltiu"]
+let rTypeInstrs: NameSet.t = strsToNameset ["add"; "sub"; "and"; "or"; "xor"; "sll"; "srl"; "sra"; "slt"; "sltu"]
 let iTypeInstrs = strsToNameset ["addi"; "ori"; "xori"; "slli"; "srli"; "srai"; "slti"; "sltiu"]
 let loadInstrs = strsToNameset ["lb"; "lbu"; "lh"; "lhu"; "lw"]
 let storeInstrs = strsToNameset ["sb"; "sh"; "sw"]
@@ -71,11 +71,11 @@ let get3TokensWithThirdTokenInParens s =
   | None -> None
 let asmParseFail formatDescription s =
   raise (AsmParseFail ("Instruction \"" ^ (charSeq2String s) ^ "\" does not follow the instruction syntax for " ^ formatDescription))
-let tryParseR opc s =
+let parseR opc s =
   match get3Tokens s with
   | Some (rd, rs1, rs2, _) -> RType { opc = opc; rd = nameToReg rd; rs1 = nameToReg rs1; rs2 = nameToReg rs2 }
   | None -> asmParseFail "R type syntax" s
-let tryParseI opc s =
+let parseI opc s =
     match get3Tokens s with
     | Some (rd, rs1, imm, _) -> IArith {
       opc = opc; rd = nameToReg rd; rs1 = nameToReg rs1;
@@ -88,32 +88,32 @@ let immOrUnboundName imm =
   match int_of_string_opt imm with
     | Some _ -> Imm imm
     | None -> UnboundName imm
-let tryParseLoad opc s =
+let parseLoad opc s =
   match get3TokensWithThirdTokenInParens s with
   | Some (rd, imm, rs1) -> Load {
     opc = opc; rd = nameToReg rd; rs1 = nameToReg rs1;
     imm = immOrUnboundName imm
   }
   | None -> asmParseFail "the instruction syntax for stores" s
-let tryParseStore opc s =
+let parseStore opc s =
   match get3TokensWithThirdTokenInParens s with
   | Some (rs2, imm, rs1) -> Store {
     opc = opc; rs2 = nameToReg rs2; rs1 = nameToReg rs1;
     imm = immOrUnboundName imm
   }
   | None -> asmParseFail "the instruction syntax for loads" s
-let tryParseBranch opc s =
+let parseBranch opc s =
   match get3Tokens s with
   | Some (rs1, rs2, label, _) -> Branch {
     opc = opc; rs1 = nameToReg rs1; rs2 = nameToReg rs2;
     imm = UnboundName label
   }
   | None -> asmParseFail "the instruction syntax for branches" s
-let tryParseJal opc s =
+let parseJal opc s =
   match get2Tokens s with
   | Some (rd, label, _) -> Jal { opc = opc; rd = nameToReg rd; imm = UnboundName label }
   | None -> asmParseFail "the instruction syntax for jal" s
-let tryParseJalr opc s =
+let parseJalr opc s =
   match get3Tokens s with
   | Some (rd, rs1, label, _) -> Jalr {
     opc = opc; rd = nameToReg rd; rs1 = nameToReg rs1; imm = UnboundName label
@@ -123,13 +123,13 @@ let tryParse s =
   match Ast.parseToken s with
   | Some (opcode, s') ->
     Some (let pred = NameSet.mem opcode in (
-      if pred rTypeInstrs then tryParseR
-      else if pred iTypeInstrs then tryParseI
-      else if pred loadInstrs then tryParseLoad
-      else if pred storeInstrs then tryParseStore
-      else if pred branchInstrs then tryParseBranch
-      else if pred jalInstrs then tryParseJal
-      else tryParseJalr
+      if pred rTypeInstrs then parseR
+      else if pred iTypeInstrs then parseI
+      else if pred loadInstrs then parseLoad
+      else if pred storeInstrs then parseStore
+      else if pred branchInstrs then parseBranch
+      else if pred jalInstrs then parseJal
+      else parseJalr
     ) opcode s')
   | None -> None
 let tryReduceTop asm =
@@ -139,13 +139,58 @@ let tryReduceTop asm =
   | None -> asm
 let tryReduceBottom asm =
   let { top; middle; bottom } = asm in
-  match tryParse (String.to_seq top) with
-  | Some instr -> { top = ""; middle = middle @ [instr]; bottom = bottom }
+  match tryParse (String.to_seq bottom) with
+  | Some instr -> { top = top; middle = middle @ [instr]; bottom = "" }
   | None -> asm
 let empty = { top = ""; middle = []; bottom = "" }
 let append asm char = let { top; middle; bottom } = asm in
   if List.length middle = 0
   then if char = '\n' then tryReduceTop asm
-    else { top = top; middle = middle; bottom = bottom ^ (String.make 1 char) }
-  else if char = '\n' then tryReduceBottom asm
     else { top = top ^ (String.make 1 char); middle = middle; bottom = bottom }
+  else if char = '\n' then tryReduceBottom asm
+    else { top = top; middle = middle; bottom = bottom ^ (String.make 1 char) }
+let funNotation name args = name ^ "(" ^ (String.concat ", " args) ^ ")"
+let regToString reg = match reg with
+  | TempReg name -> "temp-" ^ name
+  | SaveReg name -> "save-" ^ name
+  | Zero -> "Zero"
+  | Ra -> "Ra"
+  | Sp -> "Sp"
+  | Gp -> "Gp"
+  | Tp -> "Tp"
+  | UnboundName name -> "(" ^ name ^ ")"
+let immToString imm = match imm with
+  | Imm i -> i
+  | UnboundName i -> "(" ^ i ^ ")"
+let instrToString instr =
+  match instr with
+  | RType { opc: opcode; rd: register; rs1: register; rs2: register } ->
+    funNotation "RType" ([opc] @ List.map regToString [rd;rs1;rs2])
+  | IArith { opc: opcode; rd: register; rs1: register; imm: immediate } ->
+    funNotation "IArith" ([opc] @ List.map regToString [rd;rs1] @ [immToString imm])
+  | Load { opc: opcode; rd: register; rs1: register; imm: immediate } ->
+    funNotation "Load" ([opc] @ List.map regToString [rd;rs1] @ [immToString imm])
+  | Store { opc: opcode; rs1: register; rs2: register; imm: immediate } ->
+    funNotation "Store" ([opc] @ List.map regToString [rs1;rs2] @ [immToString imm])
+  | Branch { opc: opcode; rs1: register; rs2: register; imm: immediate } ->
+    funNotation "Branch" ([opc] @ List.map regToString [rs1;rs2] @ [immToString imm])
+  | Jal { opc: opcode; rd: register; imm: immediate } ->
+    funNotation "Jal(" ([opc] @ List.map regToString [rd] @ [immToString imm])
+  | Jalr { opc: opcode; rd: register; rs1: register; imm: immediate } ->
+    funNotation "Jalr" ([opc] @ List.map regToString [rd;rs1] @ [immToString imm])
+let asmToString asm =
+  let { top; middle; bottom} = asm in
+  top ^ (middle |> List.map instrToString |> String.concat "\n") ^ bottom
+let printAsm str = (String.to_seq str) |> Seq.fold_left append empty
+  |> asmToString |> print_endline
+
+let%expect_test _ =
+  printAsm {|
+  add t0 t1 t2
+  addi a0 a1 0x66
+  lbu s4 12(t6)
+  beq a5 t3 END
+  jal ra END3
+  jalr zero t4 END2
+  |};
+  [%expect]
