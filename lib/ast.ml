@@ -1,3 +1,5 @@
+open ParseUtil
+
 exception ParseFail of string
 module Environment = Map.Make(String)
 
@@ -5,6 +7,7 @@ type expr =
   | Name of string
   | Var of var
   | Asm of string
+  | ParsedAsm of Assembly.t
   | Template of template
   | Lam of lam
   | LamApplication of lam_application
@@ -27,6 +30,7 @@ let rec exprToString (e: expr): string = match e with
   | Name s -> "Name(" ^ s ^ ")"
   | Var { name; _ } -> "Var(name=" ^ name ^ ")"
   | Asm s -> "Asm(" ^ s ^ ")"
+  | ParsedAsm _ -> "TODO!!!!!"
   | Template exprs -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
   | Lam { params; value; _ } -> "Lam(params=[" ^
     List.fold_left (^) "" (List.map exprToString (List.map (fun v -> Var v) params)) ^ "], value="
@@ -36,41 +40,6 @@ let rec exprToString (e: expr): string = match e with
     exprToString lam ^ ", args=("
     ^ String.concat ", " (List.map exprToString args)
     ^ "))"
-let rec takeWhileRec pred acc s =
-  match Seq.uncons s with
-  | Some (c, s') -> if pred c
-    then takeWhileRec pred (c :: acc) s'
-    else acc, (Seq.cons c s')
-  | None -> acc, s
-let takeWhile pred s = takeWhileRec pred [] s
-
-let isWhitespace char = List.mem char [' '; '\n'; '\t'; '\r']
-let rec consumeWhitespace stream =
-  let char = Seq.uncons stream in
-    match char with
-    | Some (c, s) -> if isWhitespace c then consumeWhitespace s else Some (c, s)
-    | None -> None
-let rec parseTokenRec stream current =
-  let char = Seq.uncons stream in
-    match char with
-    | Some (c, s) ->
-      if isWhitespace c
-        then Some (current, s)
-      else if List.mem c ['[';']';'(';')';'{';'}']
-        then if current = ""
-          then Some (String.make 1 c, s)
-          else Some (current, Seq.cons c s)
-      else parseTokenRec s (current ^ String.make 1 c)
-    | None -> if current = "" then None else Some (current, stream)
-let parseToken stream =
-  match consumeWhitespace stream with
-    | Some (c, s) -> parseTokenRec (Seq.cons c s) ""
-    | None -> None
-
-let inputChannelToSeq ic = Seq.of_dispenser (fun () -> (
-  try Some (input_char ic) with
-    End_of_file -> None
-  ))
 
 
 let rec parseTopLevel acc s =
