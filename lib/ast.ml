@@ -23,6 +23,28 @@ and lam_application = {
   args: expr list
 }
 
+
+let rec exprToString (e: expr): string = match e with
+  | Name s -> "Name(" ^ s ^ ")"
+  | Var { name; _ } -> "Var(name=" ^ name ^ ")"
+  | Asm s -> "Asm(" ^ s ^ ")"
+  | Template exprs -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
+  | Lam { params; value; _ } -> "Lam(params=[" ^
+    List.fold_left (^) "" (List.map exprToString (List.map (fun v -> Var v) params)) ^ "], value="
+    ^ (exprToString value)
+    ^ ")"
+  | LamApplication { lam; args } -> "LamApplication(lam=" ^
+    exprToString lam ^ ", args=("
+    ^ String.concat ", " (List.map exprToString args)
+    ^ "))"
+let rec takeWhileRec pred acc s =
+  match Seq.uncons s with
+  | Some (c, s') -> if pred c
+    then takeWhileRec pred (c :: acc) s'
+    else acc, (Seq.cons c s')
+  | None -> acc, s
+let takeWhile pred s = takeWhileRec pred [] s
+
 let isWhitespace char = List.mem char [' '; '\n'; '\t'; '\r']
 let rec consumeWhitespace stream =
   let char = Seq.uncons stream in
@@ -73,8 +95,7 @@ and parseLam stream =
         let p, s' = parseVarList [] s in
           let value, s'' = parseExpr s' in (
             Lam { params = p; value = value; env = Environment.empty },
-            let t = parseToken s'' in
-              match t with
+              match parseToken s'' with
               | Some ("]", s''') -> s'''
               | Some (tok, _) -> raise (ParseFail ("Expected \"]\" to close lam expression, but got " ^ tok ^ " instead"))
               | None -> raise (ParseFail "Unexpected end of file before close of lam expression")
@@ -104,9 +125,9 @@ and parseTemplate stream = let asm, s = parseAsm stream in
   | None -> raise (ParseFail "Unexpected end-of-file before close of template")
 and parseAsm stream =
   let pred = fun c -> not (List.mem c ['}';'[']) in
-    let asm = Seq.take_while pred stream in
-      (Seq.fold_left (fun s c -> s ^ (String.make 1 c)) "" asm),
-      Seq.drop_while pred stream
+    let asm, s = takeWhile pred stream in
+      (List.fold_left (fun s c -> s ^ (String.make 1 c)) "" asm),
+      s
 and parseExpr stream = let token = parseToken stream in
   match token with
   | Some ("{", s) -> let template, s = parseTemplate s in Template template, s
@@ -141,19 +162,6 @@ and parseVarList accumulator stream =
 
 let parseFile ic = parseTopLevel [] (inputChannelToSeq ic)
 
-let rec exprToString (e: expr): string = match e with
-  | Name s -> "Name(" ^ s ^ ")"
-  | Var { name; _ } -> "Var(name=" ^ name ^ ")"
-  | Asm s -> "Asm(" ^ s ^ ")"
-  | Template exprs -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
-  | Lam { params; value; _ } -> "Lam(params=[" ^
-    List.fold_left (^) "" (List.map exprToString (List.map (fun v -> Var v) params)) ^ "], value="
-    ^ (exprToString value)
-    ^ ")"
-  | LamApplication { lam; args } -> "LamApplication(lam=" ^
-    exprToString lam ^ ", args=("
-    ^ String.concat ", " (List.map exprToString args)
-    ^ "))"
 let getAst text = text |> String.to_seq |> (parseTopLevel [])
 let printAst text: unit =
   text |> getAst |> List.map exprToString |> List.iter print_endline
