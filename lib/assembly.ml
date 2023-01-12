@@ -39,7 +39,6 @@ let temporaries = strsToNameset ["t0"; "t1"; "t2"; "t3"; "t4"; "t5"; "t6"; "a0";
 let saved = strsToNameset ["s0"; "s1"; "s2"; "s3"; "s4"; "s5"; "s6"; "s7"; "s8"; "s9"; "s10"; "s11"]
 let failWithNoBinding name = raise (AsmParseFail ("Could not find binding for name \"" ^ name ^ "\""))
 
-
 let rec nameToReg env name =
   if NameSet.mem name temporaries then TempReg name
   else if NameSet.mem name saved then SaveReg name
@@ -50,7 +49,7 @@ let rec nameToReg env name =
   else if name = "tp" then Tp
   else nameToReg env (env name "Register name")
 let resolveNumericalImm env imm =
-  match int_of_string_opt imm with
+  match imm |> int_of_string_opt with
   | Some _ -> imm
   | None -> env imm "Numerical immediate"
 let asmParseFail formatDescription s =
@@ -61,10 +60,10 @@ let parseR env opc s =
   | None -> asmParseFail "R type syntax" s
 let parseI env opc s =
     match get3Tokens s with
-    | Some (rd, rs1, imm, _) -> (IArith {
+    | Some (rd, rs1, imm, _) -> IArith {
       opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1;
       imm = resolveNumericalImm env imm
-    })
+    }
     | None -> asmParseFail "I type arithmetic instruction syntax" s
 let parseLoad env opc s =
   match get3TokensWithThirdTokenInParens s with
@@ -107,7 +106,8 @@ let tryParse env s =
       else if pred storeInstrs then parseStore
       else if pred branchInstrs then parseBranch
       else if pred jalInstrs then parseJal
-      else parseJalr
+      else if pred jalrInstrs then parseJalr
+      else raise (AsmParseFail ("Unrecognized opcode " ^ opcode))
     ) env opcode s')
   | None -> None
 let tryReduceTop env asm =
@@ -127,7 +127,7 @@ let append env asm char = let { top; middle; bottom } = asm in
     else { top = top ^ (String.make 1 char); middle = middle; bottom = bottom }
   else if char = '\n' then tryReduceBottom env asm
     else { top = top; middle = middle; bottom = bottom ^ (String.make 1 char) }
-let funNotation name args = name ^ "(" ^ (String.concat ", " args) ^ ")"
+let parse acc env asm = String.to_seq asm |> Seq.fold_left (append env) acc
 let regToString reg = match reg with
   | TempReg name -> "temp-" ^ name
   | SaveReg name -> "save-" ^ name

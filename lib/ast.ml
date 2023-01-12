@@ -30,7 +30,9 @@ let rec exprToString (e: expr): string = match e with
   | Name s -> "Name(" ^ s ^ ")"
   | Var { name; _ } -> "Var(name=" ^ name ^ ")"
   | Asm s -> "Asm(" ^ s ^ ")"
-  | ParsedAsm _ -> "TODO!!!!!"
+  | ParsedAsm { top; middle; bottom } ->
+    let middle = middle |> List.map Assembly.instrToString |> String.concat "\n" in
+      funNotation "ParsedAsm" [top;middle;bottom]
   | Template exprs -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
   | Lam { params; value; _ } -> "Lam(params=[" ^
     List.fold_left (^) "" (List.map exprToString (List.map (fun v -> Var v) params)) ^ "], value="
@@ -44,12 +46,12 @@ let rec exprToString (e: expr): string = match e with
 
 let rec parseTopLevel acc s =
   List.map fst (
-    let char = Seq.uncons s in
-      match char with
+    let cs = consumeWhitespace s in (
+      match cs with
       | Some ('[', s') -> List.cons (parseList s') acc
       | Some (x, _) -> raise (ParseFail ("Expected '[', not " ^ String.make 1 x))
       | None -> acc
-  )
+  ))
 and parseList stream =
   let token = parseToken stream in
     match token with
@@ -94,7 +96,7 @@ and parseTemplate stream = let asm, s = parseAsm stream in
 and parseAsm stream =
   let pred = fun c -> not (List.mem c ['}';'[']) in
     let asm, s = takeWhile pred stream in
-      (List.fold_left (fun s c -> s ^ (String.make 1 c)) "" asm),
+      (List.fold_left (fun s c -> (String.make 1 c) ^ s) "" asm),
       s
 and parseExpr stream = let token = parseToken stream in
   match token with
@@ -127,6 +129,25 @@ and parseVarList accumulator stream =
     parseVarList (v :: accumulator) s'
   | Some (x, _) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x))
   | None -> raise (ParseFail "Expected ']' or '(', not end-of-file")
+let thisIsUnevaluatedOrNotAssembly description e =
+  raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly"))
+let rec exprToParsedAsm env e =
+  match e with
+  | Name _ -> thisIsUnevaluatedOrNotAssembly "unbound name" e
+  | Var _ -> thisIsUnevaluatedOrNotAssembly "variable declaration" e
+  | Asm s -> Assembly.parse Assembly.empty env s
+  | ParsedAsm a -> a
+  | Template tem -> tem |> List.map (exprToParsedAsm env) |> List.fold_left (
+    fun acc (next: Assembly.t) -> let spliced = Assembly.parse acc env next.top in (
+      if String.trim spliced.bottom <> "" then (raise (Assembly.AsmParseFail (
+        "The blocks of assembly " ^ (Assembly.asmToString acc) ^ " and " ^ (Assembly.asmToString next) ^ "Do not combine to form valid assembly"
+      ))) else {
+        top = spliced.top; middle = spliced.middle @ next.middle; bottom = next.bottom
+      }
+    )
+  ) Assembly.empty
+  | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam definition" e
+  | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e
 
 let parseFile ic = parseTopLevel [] (inputChannelToSeq ic)
 

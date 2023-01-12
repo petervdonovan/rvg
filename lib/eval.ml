@@ -21,9 +21,11 @@ let rec evalExpr env e = match e with
     "A parameter is not an expression, but tried to evaluate "
     ^ (Ast.exprToString (Ast.Var v))))
   | Ast.ParsedAsm p -> Ast.ParsedAsm p, env
-  | Ast.Asm asm -> Ast.Asm asm, env
-  | Ast.Template tem -> let exprs', env' = evalExprListInOrder env tem
-        in Ast.Template exprs', env'
+  | Ast.Asm asm -> Ast.ParsedAsm (Assembly.parse Assembly.empty (expectAsm env) asm), env
+  | Ast.Template tem ->
+    let exprs', env' = evalExprListInOrder env tem in
+    let tem = Ast.Template exprs' in
+    ParsedAsm (Ast.exprToParsedAsm (expectAsm env') tem), env'
   | Ast.Lam lam -> Ast.Lam lam, env
   | Ast.LamApplication { lam; args } ->
     let lam', env' = evalExpr env lam in
@@ -38,16 +40,16 @@ and evalExprListInOrder env exprList =
         expr' :: exprs, env'
     ) ([], env) exprList
   in List.rev exprs, env
+and expectAsm env name description =
+(if Environment.mem name env
+  then match evalExpr env (Environment.find name env) with
+  | Ast.Asm num, _ -> num
+  | Ast.ParsedAsm p, _ -> p.top
+  | bad, _ -> raise (Assembly.AsmParseFail (
+    description ^ " expected, but found expression " ^ Ast.exprToString bad))
+  else Assembly.failWithNoBinding name)
 
-let expectAsm env name description =
-  (if Environment.mem name env
-    then match evalExpr env (Environment.find name env) with
-    | Ast.Asm num, _ -> num
-    | bad, _ -> raise (Assembly.AsmParseFail (
-      description ^ " expected, but found expression " ^ Ast.exprToString bad))
-    else Assembly.failWithNoBinding name)
-let printAsm str = (String.to_seq str)
-  |> Seq.fold_left (Assembly.append (expectAsm Environment.empty)) Assembly.empty
+let printAsm str = str |> Assembly.parse Assembly.empty (expectAsm Environment.empty)
   |> Assembly.asmToString |> print_endline
 
 let%expect_test _ =
@@ -83,5 +85,32 @@ let%expect_test _ = printReducedAst "[[lam [] {}]]";
 let%expect_test _ = printReducedAst "[[lam [(x)] {}] {} ]";
   [%expect{| Template() |}]
 
-let%expect_test _ = printReducedAst "[[lam [(x)] { [[lam [(x)] {y}] {}] x }] { alphabet }]";
-  [%expect {| Template(Asm( )Template(Asm(y))Asm( x )) |}]
+let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (Ast.exprToParsedAsm (expectAsm Environment.empty) (Ast.Asm " 12 "))))
+
+let%expect_test _ = Ast.printAst {|
+  [[lam [(x)] {
+    [[lam [(x)] {
+      addi zero zero x
+    }] x]
+    x
+  }] { 12 }]
+  |};
+  [%expect {|  |}]
+
+
+let%expect_test _ = printReducedAst {|
+    [[lam [(x)] {
+      addi t0 t1 x
+    }] { 12 }]
+  |};
+  [%expect {|  |}]
+
+let%expect_test _ = printReducedAst {|
+  [[lam [(x)] {
+    [[lam [(x)] {
+      addi zero zero x
+    }] x]
+    slli t1 t2 x
+  }] { 12 }]
+  |};
+  [%expect {|  |}]

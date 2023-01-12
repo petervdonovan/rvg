@@ -55,3 +55,4 @@ let get3TokensWithThirdTokenInParens s =
       else Some (reg, imm, rs2)
     | None -> None)
   | None -> None
+let funNotation name args = name ^ "(" ^ (String.concat ", " args) ^ ")"
