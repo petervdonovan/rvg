@@ -124,7 +124,7 @@ and parseArgs stream accumulator =
 and parseVarList accumulator stream =
   let c = consumeWhitespace stream in
   match c with
-  | Some (']', s) -> accumulator, s
+  | Some (']', s) -> List.rev accumulator, s
   | Some ('(', s) -> let v, s' = parseVar s in
     parseVarList (v :: accumulator) s'
   | Some (x, _) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x))
@@ -139,8 +139,11 @@ let rec exprToParsedAsm env e =
   | ParsedAsm a -> a
   | Template tem -> tem |> List.map (exprToParsedAsm env) |> List.fold_left (
     fun acc (next: Assembly.t) -> let spliced = Assembly.parse acc env next.top in (
-      if String.trim spliced.bottom <> "" then (raise (Assembly.AsmParseFail (
-        "The blocks of assembly " ^ (Assembly.asmToString acc) ^ " and " ^ (Assembly.asmToString next) ^ "Do not combine to form valid assembly"
+      if List.length next.middle = 0 then
+        spliced
+      else if String.trim spliced.bottom <> "" then (raise (Assembly.AsmParseFail (
+        "The blocks of assembly \"" ^ (exprToString (ParsedAsm acc)) ^ "\" and \""
+        ^ (exprToString (ParsedAsm next)) ^ "\" do not combine to form valid assembly"
       ))) else {
         top = spliced.top; middle = spliced.middle @ next.middle; bottom = next.bottom
       }
@@ -156,8 +159,12 @@ let printAst text: unit =
   text |> getAst |> List.map exprToString |> List.iter print_endline
 
 let%expect_test _ =
-  printAst "[lam [] \"\" ]";
-  [%expect{| Lam(params=[], value=Name("")) |}]
+printAst "[lam [] \"\" ]";
+[%expect{| Lam(params=[], value=Name("")) |}]
+
+let%expect_test _ =
+  printAst "[lam [(a) (b) (c)] \"\" ]";
+  [%expect{| Lam(params=[Var(name=a)Var(name=b)Var(name=c)], value=Name("")) |}]
 
 let%expect_test _ =
   printAst "[a [lam [] test0] test1 ]";

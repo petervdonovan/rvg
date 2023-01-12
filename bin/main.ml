@@ -6,10 +6,12 @@ let () =
   let ic = open_in file in
   try
     print_newline ();
-    List.iter print_endline (List.map Rvg.Ast.exprToString (
+    (Rvg.Ast.parseTopLevel [] (Rvg.ParseUtil.inputChannelToSeq ic)) |> Rvg.Eval.evalProgram |> List.map Rvg.Ast.exprToString |> List.iter print_endline;
+
+    (* List.iter print_endline (List.map Rvg.Ast.exprToString (
       ( Rvg.Ast.parseTopLevel [] (Rvg.ParseUtil.inputChannelToSeq ic))
-    ));
-    print_newline ();
+    )); *)
+    print_newline();
   with e ->
     (* some unexpected exception occurs *)
     close_in_noerr ic;

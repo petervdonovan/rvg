@@ -31,7 +31,9 @@ let rec evalExpr env e = match e with
     let lam', env' = evalExpr env lam in
       let args', _ = evalExprListInOrder env' args in
         match lam' with
-        | Lam { params; value; env } -> evalExpr (bindNames env params args') value
+        | Lam { params; value; env } ->
+          let result, _ = evalExpr (bindNames env params args') value in
+          result, env'
         | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e))
 and evalExprListInOrder env exprList =
   let exprs, env = List.fold_left
@@ -80,12 +82,13 @@ let%expect_test _ = printReducedAst "[lam [] \"\" ]";
   [%expect{| Lam(params=[], value=Name("")) |}]
 
 let%expect_test _ = printReducedAst "[[lam [] {}]]";
-  [%expect{| Template() |}]
+  [%expect{| ParsedAsm(, , ) |}]
 
 let%expect_test _ = printReducedAst "[[lam [(x)] {}] {} ]";
-  [%expect{| Template() |}]
+  [%expect{| ParsedAsm(, , ) |}]
 
-let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (Ast.exprToParsedAsm (expectAsm Environment.empty) (Ast.Asm " 12 "))))
+let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (Ast.exprToParsedAsm (expectAsm Environment.empty) (Ast.Asm " 12 "))));
+  [%expect {| ParsedAsm( 12 , , ) |}]
 
 let%expect_test _ = Ast.printAst {|
   [[lam [(x)] {
@@ -95,7 +98,13 @@ let%expect_test _ = Ast.printAst {|
     x
   }] { 12 }]
   |};
-  [%expect {|  |}]
+  [%expect {|
+    LamApplication(lam=Lam(params=[Var(name=x)], value=Template(Asm(
+        )LamApplication(lam=Lam(params=[Var(name=x)], value=Template(Asm(
+          addi zero zero x
+        ))), args=(Name(x)))Asm(
+        x
+      ))), args=(Template(Asm( 12 )))) |}]
 
 
 let%expect_test _ = printReducedAst {|
@@ -103,7 +112,7 @@ let%expect_test _ = printReducedAst {|
       addi t0 t1 x
     }] { 12 }]
   |};
-  [%expect {|  |}]
+  [%expect {| ParsedAsm(, IArith(addi, temp-t0, temp-t1,  12 ),     ) |}]
 
 let%expect_test _ = printReducedAst {|
   [[lam [(x)] {
@@ -113,4 +122,6 @@ let%expect_test _ = printReducedAst {|
     slli t1 t2 x
   }] { 12 }]
   |};
-  [%expect {|  |}]
+  [%expect {|
+    ParsedAsm(    , IArith(addi, Zero, Zero,  12 )
+    IArith(slli, temp-t1, temp-t2,  12 ),   ) |}]
