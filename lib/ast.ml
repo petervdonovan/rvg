@@ -2,22 +2,35 @@ open ParseUtil
 
 exception ParseFail of string
 module Environment = Map.Make(String)
+module Attributes = Set.Make(String)
 
+type metadata = {
+  attrs: Attributes.t;
+  r: CharStream.range;
+}
+let metaInitial r = {attrs=Attributes.empty;r}
+let metaEmpty = {
+  attrs = Attributes.empty;
+  r = {
+    startInclusive = {zeroBasedLine = 0; zeroBasedCol = 0};
+    endExclusive = {zeroBasedLine = 0; zeroBasedCol = 0};
+  }
+}
 type expr =
-  | Name of string
-  | Var of var
-  | Asm of string
-  | ParsedAsm of Assembly.t
-  | Template of template
-  | Lam of lam
-  | LamApplication of lam_application
+  | Name of (string * metadata)
+  | Var of (var * metadata)
+  | Asm of (string * metadata)
+  | ParsedAsm of (Assembly.t * metadata)
+  | Template of (template * metadata)
+  | Lam of (lam * metadata)
+  | LamApplication of (lam_application * metadata)
 and template = expr list
 and var = {
   name: string;
-  checks: lam list
+  checks: (lam * metadata) list
 }
 and lam = {
-  params: var list;
+  params: (var * metadata) list;
   value: expr;
   env: expr Environment.t
 }
@@ -27,18 +40,20 @@ and lam_application = {
 }
 
 let rec exprToString (e: expr): string = match e with
-  | Name s -> "Name(" ^ s ^ ")"
-  | Var { name; _ } -> "Var(name=" ^ name ^ ")"
-  | Asm s -> "Asm(" ^ s ^ ")"
-  | ParsedAsm { top; middle; bottom } ->
+  | Name (s, _) -> "Name(" ^ s ^ ")"
+  | Var ({ name; _ }, _) -> "Var(name=" ^ name ^ ")"
+  | Asm (s, _) -> "Asm(" ^ s ^ ")"
+  | ParsedAsm ({ top; middle; bottom }, _) ->
     let middle = middle |> List.map Assembly.instrToString |> String.concat "\n" in
-      funNotation "ParsedAsm" [top;middle;bottom]
-  | Template exprs -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
-  | Lam { params; value; _ } -> "Lam(params=[" ^
-    List.fold_left (^) "" (List.map exprToString (List.map (fun v -> Var v) params)) ^ "], value="
+      funNotation "ParsedAsm" [Assembly.fragmentToString top; middle; Assembly.fragmentToString bottom]
+  | Template (exprs, _) -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
+  | Lam ({ params; value; _ }, _) -> "Lam(params=[" ^
+    List.fold_left (^) "" (List.map exprToString (
+      List.map (fun v -> Var (v, metaEmpty)) (List.map fst params)
+    )) ^ "], value="
     ^ (exprToString value)
     ^ ")"
-  | LamApplication { lam; args } -> "LamApplication(lam=" ^
+  | LamApplication ({ lam; args }, _) -> "LamApplication(lam=" ^
     exprToString lam ^ ", args=("
     ^ String.concat ", " (List.map exprToString args)
     ^ "))"
@@ -46,88 +61,106 @@ let rec exprToString (e: expr): string = match e with
 
 let rec parseTopLevel acc s =
   List.map fst (
-    let cs = consumeWhitespace s in (
+    let cs = CharStream.consumeWhitespace s in (
       match cs with
-      | Some ('[', s') -> List.cons (parseList s') acc
-      | Some (x, _) -> raise (ParseFail ("Expected '[', not " ^ String.make 1 x))
+      | Some ('[', s', p) -> List.cons (parseList p s') acc
+      | Some (x, _, _) -> raise (ParseFail ("Expected '[', not " ^ String.make 1 x))
       | None -> acc
   ))
-and parseList stream =
-  let token = parseToken stream in
+and parseList startPos stream =
+  let token = CharStream.parseToken stream in
     match token with
-    | Some ("lam", s) -> parseLam s
-    | Some (t, s) -> parseLamApplication t s
+    | Some ("lam", s, _) -> parseLam startPos s
+    | Some (t, s, r) -> parseLamApplication (t, r) s
     | None -> raise (ParseFail "Trailing '['")
-and parseLam stream =
-  let char = consumeWhitespace stream in
+and parseLam startPos stream =
+  let char = CharStream.consumeWhitespace stream in
     match char with
-      | Some ('[', s) ->
-        let p, s' = parseVarList [] s in
+      | Some ('[', s, p) ->
+        let p, _, s' = parseVarList p [] s in
           let value, s'' = parseExpr s' in (
-            Lam { params = p; value = value; env = Environment.empty },
-              match parseToken s'' with
-              | Some ("]", s''') -> s'''
-              | Some (tok, _) -> raise (ParseFail ("Expected \"]\" to close lam expression, but got " ^ tok ^ " instead"))
-              | None -> raise (ParseFail "Unexpected end of file before close of lam expression")
+            match CharStream.parseToken s'' with
+            | Some ("]", s''', r) -> Lam (
+              { params = p; value = value; env = Environment.empty },
+              metaInitial {startInclusive=startPos; endExclusive=r.endExclusive}
+              ), s'''
+            | Some (tok, _, _) -> raise (ParseFail ("Expected \"]\" to close lam expression, but got " ^ tok ^ " instead"))
+            | None -> raise (ParseFail "Unexpected end of file before close of lam expression")
           )
       | _ -> raise (ParseFail "expected '['")
-and parseVar stream =
-  let name = parseToken stream in
+and parseVar startInclusive stream =
+  let name = CharStream.parseToken stream in
     match name with
-    | Some (")", _) -> raise (ParseFail "Expected name, not ')'")
-    | Some (n, s) -> let checks, s' = parseChecks s in { name = n; checks = checks }, (
-        match parseToken s' with
-        | Some(")", s'') -> s''
-        | Some(bad, _) -> raise (ParseFail ("Expected ')', not " ^ bad))
+    | Some (")", _, _) -> raise (ParseFail "Expected name, not ')'")
+    | Some (n, s, _) ->
+      let checks, s' = parseChecks s in (
+        match CharStream.parseToken s' with
+        | Some(")", s'', r') -> (
+          { name = n; checks = checks },
+          metaInitial {startInclusive; endExclusive=r'.endExclusive}),
+          s''
+        | Some(bad, _, _) -> raise (ParseFail ("Expected ')', not " ^ bad))
         | None -> raise (ParseFail "Expected ')', not end-of-file")
       )
     | None -> raise (ParseFail "Expected name, not end-of-file")
 
-and parseTemplate stream = let asm, s = parseAsm stream in
-  if asm <> "" then let rest, s' = parseTemplate s in
-    List.cons (Asm asm) rest, s'
-  else match parseToken s with
-  | Some ("}", s') -> [], s'
-  | Some ("[", s') -> let e, s'' = parseList s' in
-    let rest, s''' = parseTemplate s'' in
+and parseTemplateRec stream = let asm, meta, s = parseAsm stream in
+  if asm <> "" then let rest, s' = parseTemplateRec s in
+    List.cons (Asm (asm, meta)) rest, s'
+  else match CharStream.parseToken s with
+  | Some ("}", s', _) -> [], s'
+  | Some ("[", s', _) -> let e, s'' = parseList s'.current s' in
+    let rest, s''' = parseTemplateRec s'' in
       List.cons e rest, s'''
   | Some _ -> raise (ParseFail "This should be unreachable")
   | None -> raise (ParseFail "Unexpected end-of-file before close of template")
+and parseTemplate startInclusive stream: template * CharStream.range * CharStream.t =
+  let template, (s: CharStream.t) = parseTemplateRec stream in
+  template, {startInclusive=startInclusive; endExclusive=s.current}, s
 and parseAsm stream =
   let pred = fun c -> not (List.mem c ['}';'[']) in
-    let asm, s = takeWhile pred stream in
+    let asm, r, s = CharStream.takeWhile pred stream in
       (List.fold_left (fun s c -> (String.make 1 c) ^ s) "" asm),
+      metaInitial r,
       s
-and parseExpr stream = let token = parseToken stream in
+and parseExpr stream = let token = CharStream.parseToken stream in
   match token with
-  | Some ("{", s) -> let template, s = parseTemplate s in Template template, s
-  | Some ("[", s) -> parseList s
+  | Some ("{", s, r) -> let (template, r', s) = parseTemplate r.startInclusive s in
+    Template (template, metaInitial r'), s
+  | Some ("[", s, r) -> parseList r.startInclusive s
+  | Some (t, s, r) -> Name (t, metaInitial r), s
   | None -> raise (ParseFail "Expected expression, not end-of-file")
-  | Some (t, s) -> Name t, s
 and parseChecks s = [], s
 and parseLamApplication token stream =
-  let lam, s' = if token = "[" then parseList stream else Name token, stream in
-    let args, s'' = parseArgs s' [] in
-    LamApplication { lam = lam; args = List.rev args }, s''
+  let t, r = token in
+  let lam, s' = (if t = "["
+    then (parseList r.startInclusive stream)
+    else Name (t, metaInitial r), stream)
+  in
+    let args, (s'': CharStream.t) = parseArgs s' [] in
+    LamApplication (
+      { lam = lam; args = List.rev args },
+      metaInitial {startInclusive = r.startInclusive; endExclusive = s''.current}
+    ), s''
 
 and parseArgs stream accumulator =
-  let token = parseToken stream in
+  let token = CharStream.parseToken stream in
   match token with
-  | Some ("]", s) -> accumulator, s
-  | Some (t, s) ->
+  | Some ("]", s, _) -> accumulator, s
+  | Some (t, s, r) ->
     let nextExpr, s' =
-      if t = "[" then parseList s
-      else if t = "{" then let tem, ss' = parseTemplate s in Template tem, ss'
-      else Name t, s
+      if t = "[" then parseList r.startInclusive s
+      else if t = "{" then let tem, r, ss' = parseTemplate r.startInclusive s in Template (tem, metaInitial r), ss'
+      else Name (t, metaInitial r), s
     in parseArgs s' (nextExpr :: accumulator)
   | None -> raise (ParseFail "Expected arg or ']', not end-of-file")
-and parseVarList accumulator stream =
-  let c = consumeWhitespace stream in
+and parseVarList startInclusive accumulator stream =
+  let c = CharStream.consumeWhitespace stream in
   match c with
-  | Some (']', s) -> List.rev accumulator, s
-  | Some ('(', s) -> let v, s' = parseVar s in
-    parseVarList (v :: accumulator) s'
-  | Some (x, _) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x))
+  | Some (']', s, p) -> List.rev accumulator, (metaInitial {startInclusive; endExclusive=CharStream.incrementedCol p}), s
+  | Some ('(', s, p) -> let v, s' = parseVar p s in
+    parseVarList startInclusive (v :: accumulator) s'
+  | Some (x, _, _) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x))
   | None -> raise (ParseFail "Expected ']' or '(', not end-of-file")
 let thisIsUnevaluatedOrNotAssembly description e =
   raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly"))
@@ -135,26 +168,38 @@ let rec exprToParsedAsm env e =
   match e with
   | Name _ -> thisIsUnevaluatedOrNotAssembly "unbound name" e
   | Var _ -> thisIsUnevaluatedOrNotAssembly "variable declaration" e
-  | Asm s -> Assembly.parse Assembly.empty env s
-  | ParsedAsm a -> a
-  | Template tem -> tem |> List.map (exprToParsedAsm env) |> List.fold_left (
-    fun acc (next: Assembly.t) -> let spliced = Assembly.parse acc env next.top in (
-      if List.length next.middle = 0 then
-        spliced
-      else if String.trim spliced.bottom <> "" then (raise (Assembly.AsmParseFail (
-        "The blocks of assembly \"" ^ (exprToString (ParsedAsm acc)) ^ "\" and \""
-        ^ (exprToString (ParsedAsm next)) ^ "\" do not combine to form valid assembly"
-      ))) else {
-        top = spliced.top; middle = spliced.middle @ next.middle; bottom = next.bottom
-      }
-    )
-  ) Assembly.empty
+  | Asm (s, meta) -> Assembly.parse (Assembly.empty meta.r.startInclusive) env s, meta
+  | ParsedAsm (a, meta) -> a, meta
+  | Template (tem, meta) -> tem |> List.map (exprToParsedAsm env) |> List.rev |> List.fold_left (
+    fun acc (nextm: Assembly.t * metadata) ->
+      let next, _ = nextm in
+      match next.top with
+      | Some (s, _) -> let spliced = Assembly.parse acc env s in
+        (match spliced.bottom with
+        | None -> {
+            top = spliced.top;
+            middle = spliced.middle @ next.middle;
+            bottom = next.bottom
+          }
+        | Some _ -> if List.length next.middle <> 0
+          then raise (Assembly.AsmParseFail ("bottom of the asm " ^ (Assembly.asmToString acc) ^ " and top of other asm " ^ (Assembly.asmToString next) ^ " did not form a complete instruction"))
+          else spliced)
+      | None -> match acc.bottom with
+        | None -> Assembly.tryReduceTop env {
+          top = acc.top;
+          middle = acc.middle @ next.middle;
+          bottom = next.bottom;
+        }
+        | Some (bottom, _) -> if bottom <> "" then {
+        top = None; middle = acc.middle @ next.middle; bottom = next.bottom
+      } else raise (Assembly.AsmParseFail "Assembly.t acc with nontrivial bottom cannot be appended to using Assembly.t with trivial top")
+    ) (Assembly.empty meta.r.startInclusive), meta
   | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam definition" e
   | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e
 
-let parseFile ic = parseTopLevel [] (inputChannelToSeq ic)
+let parseFile ic = parseTopLevel [] (CharStream.inputChannelToSeq ic)
 
-let getAst text = text |> String.to_seq |> (parseTopLevel [])
+let getAst text = text |> (CharStream.fromString CharStream.origin) |> (parseTopLevel [])
 let printAst text: unit =
   text |> getAst |> List.map exprToString |> List.iter print_endline
 

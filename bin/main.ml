@@ -6,7 +6,7 @@ let () =
   let ic = open_in file in
   try
     print_newline ();
-    (Rvg.Ast.parseTopLevel [] (Rvg.ParseUtil.inputChannelToSeq ic)) |> Rvg.Eval.evalProgram |> List.map Rvg.Ast.exprToString |> List.iter print_endline;
+    (Rvg.Ast.parseTopLevel [] (Rvg.CharStream.inputChannelToSeq ic)) |> Rvg.Eval.evalProgram |> List.map Rvg.Ast.exprToString |> List.iter print_endline;
 
     (* List.iter print_endline (List.map Rvg.Ast.exprToString (
       ( Rvg.Ast.parseTopLevel [] (Rvg.ParseUtil.inputChannelToSeq ic))
