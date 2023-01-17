@@ -25,7 +25,17 @@ type instruction =
   | Branch of s_or_b_format
   | Jal of u_or_j_format
   | Jalr of i_format
-type t = { top: (string * position) option; middle: instruction list; bottom: (string * position) option }
+type fragment = string
+type finished_block =
+  | MetaBlock of finished_block list
+  | Instruction of instruction
+type block = { top: fragment; middle: finished_block list; bottom: fragment }
+type t =
+  | Fragment of fragment
+  | Block of block
+  | FinishedBlock of finished_block
+let isEmpty fragment = fragment = ""
+let empty = Fragment ""
 
 module NameSet = Set.Make(String)
 let strsToNameset strs = List.fold_right NameSet.add strs NameSet.empty
@@ -63,14 +73,16 @@ let instrToString instr =
     funNotation "Jal" ([fst opc] @ List.map regToString [rd] @ [fst imm])
   | Jalr { opc: opcode; rd: register; rs1: register; imm: immediate } ->
     funNotation "Jalr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
-let fragmentToString s = match s with
-  | Some (s', _) -> s'
-  | None -> ""
-let asmToString asm =
-  let { top; middle; bottom} = asm in
-  (fragmentToString top)
-  ^ (middle |> List.map instrToString |> String.concat "\n")
-  ^ (fragmentToString bottom)
+let rec finishedBlockToString fb =
+  match fb with
+  | Instruction i -> instrToString i
+  | MetaBlock mb -> mb |> List.map finishedBlockToString |> String.concat "\n"
+let rec asmToString asm =
+  match asm with
+  | Fragment s -> s
+  | Block {top; middle; bottom} -> funNotation "Assembly.t"
+    [top; asmToString (FinishedBlock (MetaBlock middle)); bottom]
+  | FinishedBlock fb -> finishedBlockToString fb
 
 let rec nameToReg env name =
   let str, r = name in
@@ -134,50 +146,83 @@ let parseJalr env opc s =
 let tryParse env s =
   match parseToken s with
   | Some (opcode, s', r) ->
-    Some (let pred = NameSet.mem opcode in (
-      if pred rTypeInstrs then parseR
-      else if pred iTypeInstrs then parseI
-      else if pred loadInstrs then parseLoad
-      else if pred storeInstrs then parseStore
-      else if pred branchInstrs then parseBranch
-      else if pred jalInstrs then parseJal
-      else if pred jalrInstrs then parseJalr
-      else raise (AsmParseFail ("Unrecognized opcode " ^ opcode))
-    ) env (opcode, r) s')
+    (let leftComposeSome = fun f x y z -> Some (f x y z) in
+    (let pred = NameSet.mem opcode in (
+      if pred rTypeInstrs then leftComposeSome parseR
+      else if pred iTypeInstrs then leftComposeSome parseI
+      else if pred loadInstrs then leftComposeSome parseLoad
+      else if pred storeInstrs then leftComposeSome parseStore
+      else if pred branchInstrs then leftComposeSome parseBranch
+      else if pred jalInstrs then leftComposeSome parseJal
+      else if pred jalrInstrs then leftComposeSome parseJalr
+      else fun _ _ _ -> None
+    ) env (opcode, r) s'))
   | None -> None
-let tryReduceTop env asm =
-  let { top; middle; bottom } = asm in
-  match top with
-  | Some (s, p) ->
-    (match tryParse env (CharStream.fromString p s) with
-    | Some instr -> {
-      top = None;
-      middle = instr :: middle;
-      bottom = match bottom with
-      | Some _ -> bottom
-      | None -> Some ("", CharStream.incrementedLine p)
-    }
-    | None -> asm)
-  | None -> raise (AsmParseFail ("Tried to reduce top of an assembly block that has no top"))
-let tryReduceBottom env asm =
-  let { top; middle; bottom } = asm in
-  match bottom with
-  | Some (s, p) ->
-    (match tryParse env (CharStream.fromString p s) with
-    | Some instr -> { top = top; middle = instr :: middle; bottom = Some ("", CharStream.incrementedLine p) }
-    | None -> asm)
-  | None -> raise (AsmParseFail ("Tried to reduce bottom of an assembly block that has no bottom"))
-let empty start = { top = Some ("", start); middle = []; bottom = None }
 let append env asm char =
-  let { top; middle; bottom } = asm in
-  let s = String.make 1 char in
-  if List.length middle = 0
-    then if char = '\n' then (ParseUtil.debug_print "reducing top of " (asmToString asm); tryReduceTop env asm)
-    else match top with
-    | Some (acc, p) -> { top = Some (acc ^ s, p); middle = middle; bottom = bottom }
-    | None -> raise (AsmParseFail ("Asm " ^ (asmToString asm) ^ " with no middle also has no top"))
-  else if char = '\n' then ( ParseUtil.debug_print "reducing bottom of " (asmToString asm); tryReduceBottom env asm)
-    else match bottom with
-    | Some (acc, p) -> { top = top; middle = middle; bottom = Some (acc ^ s, p) }
-    | None -> raise (AsmParseFail ("Asm " ^ (asmToString asm) ^ " with a middle has no bottom"))
+  match asm with
+  | Fragment s ->
+    let appended = (String.make 1 char) ^ s |> CharStream.fromString origin in
+    (match tryParse env appended with
+    | Some instr -> Block {top = ""; middle = [Instruction instr]; bottom = ""}
+    | None -> Fragment (s ^ String.make 1 char))
+  | Block {top;middle;bottom} ->
+    let appendedBottom = bottom |> CharStream.fromString origin |> CharStream.cons char in
+    (match tryParse env appendedBottom with
+    | Some instr -> Block {
+        top;
+        middle = middle @ [Instruction instr];
+        bottom = ""
+      }
+    | None -> Block {
+      top;
+      middle;
+      bottom = bottom ^ String.make 1 char
+    })
+  | FinishedBlock fb -> Block {
+      top = "";
+      middle = [fb];
+      bottom = String.make 1 char
+    }
+let prependBlock env acc prependable =
+  let glueFail = (AsmParseFail (
+    "\"" ^ (asmToString prependable) ^ "\" and \""
+    ^ (asmToString (Block acc))
+    ^ " cannot be glued together."
+  )) in
+  match prependable with
+  | Fragment s -> {top = s ^ acc.top; middle = acc.middle; bottom = acc.bottom}
+  | Block {top; middle; bottom} -> (
+    let glue = bottom ^ acc.top in
+    match tryParse env (CharStream.fromString origin glue) with
+    | Some parsed -> {
+        top = top;
+        middle = middle @ [Instruction parsed] @ acc.middle;
+        bottom = acc.bottom
+      }
+    | None -> raise glueFail)
+  | FinishedBlock fb ->
+    let gluableAcc = if acc.top = "" then acc else (
+      match tryParse env (CharStream.fromString origin acc.top) with
+      | Some inst -> {top=""; middle = [Instruction inst] @ acc.middle; bottom = acc.bottom}
+      | None -> raise glueFail
+    ) in
+    {top = ""; middle = [fb] @ gluableAcc.middle; bottom = gluableAcc.bottom}
+let rec promoteToFinishedIfPossible env asm =
+  match asm with
+  | Block b -> (
+    if b.top = ""
+      then if b.bottom = ""
+        then FinishedBlock (MetaBlock b.middle)
+      else match tryParse env (CharStream.fromString origin b.bottom) with
+      | Some instr -> promoteToFinishedIfPossible env
+        (Block {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""})
+      | None -> asm
+    else match tryParse env (CharStream.fromString origin b.top) with
+      | Some instr -> promoteToFinishedIfPossible env
+      (Block {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""})
+    | None -> asm)
+  | FinishedBlock _ -> asm
+  | Fragment f -> match tryParse env (CharStream.fromString origin f) with
+    | Some instr -> FinishedBlock (Instruction instr)
+    | None -> asm
 let parse acc env asm = String.to_seq asm |> Seq.fold_left (append env) acc

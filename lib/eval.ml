@@ -22,7 +22,7 @@ let rec evalExpr env e = match e with
     ^ (Ast.exprToString e)))
   | Ast.ParsedAsm (_, _) -> e, env
   | Ast.Asm (asm, meta) -> Ast.ParsedAsm (
-      (Assembly.parse (Assembly.empty meta.r.startInclusive) (expectAsm env) asm),
+      (Assembly.parse Assembly.empty (expectAsm env) asm),
       meta
     ), env
   | Ast.Template (tem, meta) ->
@@ -49,14 +49,14 @@ and expectAsm env name description =
 (if Environment.mem name env
   then match evalExpr env (Environment.find name env) with
   | Ast.Asm (num, meta), _ -> num, meta.r
-  | Ast.ParsedAsm (pasm, meta), _ -> (match (pasm.top, pasm.bottom) with
-    | (Some (s, _), None) -> s, meta.r
-    | _ -> raise (Assembly.AsmParseFail "Expected asm fragment but got asm"))
+  | Ast.ParsedAsm (pasm, meta), _ -> (match pasm with
+    | Fragment f -> f, meta.r
+    | _ -> raise (Assembly.AsmParseFail ("Expected assembly fragment, but got assembly block")))
   | bad, _ -> raise (Assembly.AsmParseFail (
     description ^ " expected, but found expression " ^ Ast.exprToString bad))
   else Assembly.failWithNoBinding name)
 
-let printAsm str = str |> Assembly.parse (Assembly.empty CharStream.origin) (expectAsm Environment.empty)
+let printAsm str = str |> Assembly.parse Assembly.empty (expectAsm Environment.empty)
   |> Assembly.asmToString |> print_endline
 
 let%expect_test _ =

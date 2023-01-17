@@ -43,9 +43,8 @@ let rec exprToString (e: expr): string = match e with
   | Name (s, _) -> "Name(" ^ s ^ ")"
   | Var ({ name; _ }, _) -> "Var(name=" ^ name ^ ")"
   | Asm (s, _) -> "Asm(" ^ s ^ ")"
-  | ParsedAsm ({ top; middle; bottom }, _) ->
-    let middle = middle |> List.map Assembly.instrToString |> String.concat "\n" in
-      funNotation "ParsedAsm" [Assembly.fragmentToString top; middle; Assembly.fragmentToString bottom]
+  | ParsedAsm (asm, _) ->
+      funNotation "ParsedAsm" [Assembly.asmToString asm]
   | Template (exprs, _) -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
   | Lam ({ params; value; _ }, _) -> "Lam(params=[" ^
     List.fold_left (^) "" (List.map exprToString (
@@ -168,32 +167,15 @@ let rec exprToParsedAsm env e =
   match e with
   | Name _ -> thisIsUnevaluatedOrNotAssembly "unbound name" e
   | Var _ -> thisIsUnevaluatedOrNotAssembly "variable declaration" e
-  | Asm (s, meta) -> Assembly.parse (Assembly.empty meta.r.startInclusive) env s, meta
+  | Asm (s, meta) -> Assembly.parse Assembly.empty env s, meta
   | ParsedAsm (a, meta) -> a, meta
-  | Template (tem, meta) -> tem |> List.map (exprToParsedAsm env) |> List.rev |> List.fold_left (
-    fun acc (nextm: Assembly.t * metadata) ->
-      let next, _ = nextm in
-      match next.top with
-      | Some (s, _) -> let spliced = Assembly.parse acc env s in
-        (match spliced.bottom with
-        | None -> {
-            top = spliced.top;
-            middle = spliced.middle @ next.middle;
-            bottom = next.bottom
-          }
-        | Some _ -> if List.length next.middle <> 0
-          then raise (Assembly.AsmParseFail ("bottom of the asm " ^ (Assembly.asmToString acc) ^ " and top of other asm " ^ (Assembly.asmToString next) ^ " did not form a complete instruction"))
-          else spliced)
-      | None -> match acc.bottom with
-        | None -> Assembly.tryReduceTop env {
-          top = acc.top;
-          middle = acc.middle @ next.middle;
-          bottom = next.bottom;
-        }
-        | Some (bottom, _) -> if bottom <> "" then {
-        top = None; middle = acc.middle @ next.middle; bottom = next.bottom
-      } else raise (Assembly.AsmParseFail "Assembly.t acc with nontrivial bottom cannot be appended to using Assembly.t with trivial top")
-    ) (Assembly.empty meta.r.startInclusive), meta
+  | Template (tem, meta) -> (tem
+    |> List.map (exprToParsedAsm env)
+    |> List.map fst
+    |> List.fold_left (Assembly.prependBlock env) {top=""; middle = []; bottom = ""}
+    |> fun b -> Assembly.Block b
+    |> Assembly.promoteToFinishedIfPossible env,
+    meta)
   | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam definition" e
   | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e
 
