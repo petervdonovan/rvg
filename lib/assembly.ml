@@ -79,10 +79,10 @@ let rec finishedBlockToString fb =
   | MetaBlock mb -> mb |> List.map finishedBlockToString |> String.concat "\n"
 let rec asmToString asm =
   match asm with
-  | Fragment s -> s
-  | Block {top; middle; bottom} -> funNotation "Assembly.t"
+  | Fragment s -> funNotation "Fragment" [s]
+  | Block {top; middle; bottom} -> funNotation "Block"
     [top; asmToString (FinishedBlock (MetaBlock middle)); bottom]
-  | FinishedBlock fb -> finishedBlockToString fb
+  | FinishedBlock fb -> funNotation "FinishedBlock" [finishedBlockToString fb]
 
 let rec nameToReg env name =
   let str, r = name in
@@ -103,60 +103,59 @@ let asmParseFail formatDescription s =
   raise (AsmParseFail ("Instruction \"" ^ (charSeqToString s) ^ "\" does not follow the instruction syntax for " ^ formatDescription))
 let parseR env opc s =
   match get3Tokens s with
-  | Some (rd, rs1, rs2, _) -> RType { opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2 }
-  | None -> asmParseFail "R type syntax" s
+  | Some (rd, rs1, rs2, _) -> Some (RType { opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2 })
+  | None -> None
 let parseI env opc s =
     match get3Tokens s with
-    | Some (rd, rs1, imm, _) -> IArith {
+    | Some (rd, rs1, imm, _) -> Some (IArith {
       opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1;
       imm = resolveNumericalImm env imm
-    }
-    | None -> asmParseFail "I type arithmetic instruction syntax" s
+    })
+    | None -> None
 let parseLoad env opc s =
   match get3TokensWithThirdTokenInParens s with
-  | Some (rd, imm, rs1) -> Load {
+  | Some (rd, imm, rs1) -> Some (Load {
     opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1;
     imm = resolveNumericalImm env imm
-  }
-  | None -> asmParseFail "the instruction syntax for stores" s
+  })
+  | None -> None
 let parseStore env opc s =
   match get3TokensWithThirdTokenInParens s with
-  | Some (rs2, imm, rs1) -> Store {
+  | Some (rs2, imm, rs1) -> Some (Store {
     opc = opc; rs2 = nameToReg env rs2; rs1 = nameToReg env rs1;
     imm = resolveNumericalImm env imm
-  }
-  | None -> asmParseFail "the instruction syntax for loads" s
+  })
+  | None -> None
 let parseBranch env opc s =
   match get3Tokens s with
-  | Some (rs1, rs2, label, _) -> Branch {
+  | Some (rs1, rs2, label, _) -> Some (Branch {
     opc = opc; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2;
     imm = label
-  }
-  | None -> asmParseFail "the instruction syntax for branches" s
+  })
+  | None -> None
 let parseJal env opc s =
   match get2Tokens s with
-  | Some (rd, label, _) -> Jal { opc = opc; rd = nameToReg env rd; imm = label }
-  | None -> asmParseFail "the instruction syntax for jal" s
+  | Some (rd, label, _) -> Some (Jal { opc = opc; rd = nameToReg env rd; imm = label })
+  | None -> None
 let parseJalr env opc s =
   match get3Tokens s with
-  | Some (rd, rs1, label, _) -> Jalr {
+  | Some (rd, rs1, label, _) -> Some (Jalr {
     opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; imm = label
-  }
-  | None -> asmParseFail "the instruction syntax for jalr" s
+  })
+  | None -> None
 let tryParse env s =
   match parseToken s with
   | Some (opcode, s', r) ->
-    (let leftComposeSome = fun f x y z -> Some (f x y z) in
     (let pred = NameSet.mem opcode in (
-      if pred rTypeInstrs then leftComposeSome parseR
-      else if pred iTypeInstrs then leftComposeSome parseI
-      else if pred loadInstrs then leftComposeSome parseLoad
-      else if pred storeInstrs then leftComposeSome parseStore
-      else if pred branchInstrs then leftComposeSome parseBranch
-      else if pred jalInstrs then leftComposeSome parseJal
-      else if pred jalrInstrs then leftComposeSome parseJalr
+      if pred rTypeInstrs then parseR
+      else if pred iTypeInstrs then parseI
+      else if pred loadInstrs then parseLoad
+      else if pred storeInstrs then parseStore
+      else if pred branchInstrs then parseBranch
+      else if pred jalInstrs then parseJal
+      else if pred jalrInstrs then parseJalr
       else fun _ _ _ -> None
-    ) env (opcode, r) s'))
+    ) env (opcode, r) s')
   | None -> None
 let append env asm char =
   match asm with
@@ -166,7 +165,7 @@ let append env asm char =
     | Some instr -> Block {top = ""; middle = [Instruction instr]; bottom = ""}
     | None -> Fragment (s ^ String.make 1 char))
   | Block {top;middle;bottom} ->
-    let appendedBottom = bottom |> CharStream.fromString origin |> CharStream.cons char in
+    let appendedBottom = (String.make 1 char) ^ bottom |> CharStream.fromString origin in
     (match tryParse env appendedBottom with
     | Some instr -> Block {
         top;
@@ -195,34 +194,31 @@ let prependBlock env acc prependable =
     let glue = bottom ^ acc.top in
     match tryParse env (CharStream.fromString origin glue) with
     | Some parsed -> {
-        top = top;
+        top;
         middle = middle @ [Instruction parsed] @ acc.middle;
         bottom = acc.bottom
       }
-    | None -> raise glueFail)
+    | None -> if String.trim glue = "" then {top; middle = middle @ acc.middle; bottom = acc.bottom} else raise glueFail)
   | FinishedBlock fb ->
-    let gluableAcc = if acc.top = "" then acc else (
+    let gluableAcc = if String.trim acc.top = "" then acc else (
       match tryParse env (CharStream.fromString origin acc.top) with
       | Some inst -> {top=""; middle = [Instruction inst] @ acc.middle; bottom = acc.bottom}
       | None -> raise glueFail
     ) in
     {top = ""; middle = [fb] @ gluableAcc.middle; bottom = gluableAcc.bottom}
-let rec promoteToFinishedIfPossible env asm =
-  match asm with
-  | Block b -> (
-    if b.top = ""
+(* Blocks must have a middle; else they are fragments;
+   they must have sticky ends; else they are finished *)
+let rec promoteOrDemote env b =
+    if List.length b.middle = 0 then Fragment b.top
+    else if b.top = ""
       then if b.bottom = ""
         then FinishedBlock (MetaBlock b.middle)
       else match tryParse env (CharStream.fromString origin b.bottom) with
-      | Some instr -> promoteToFinishedIfPossible env
-        (Block {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""})
-      | None -> asm
+      | Some instr -> promoteOrDemote env
+        {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""}
+      | None -> Block b
     else match tryParse env (CharStream.fromString origin b.top) with
-      | Some instr -> promoteToFinishedIfPossible env
-      (Block {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""})
-    | None -> asm)
-  | FinishedBlock _ -> asm
-  | Fragment f -> match tryParse env (CharStream.fromString origin f) with
-    | Some instr -> FinishedBlock (Instruction instr)
-    | None -> asm
-let parse acc env asm = String.to_seq asm |> Seq.fold_left (append env) acc
+      | Some instr -> promoteOrDemote env
+        {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""}
+    | None -> Block b
+let parse acc env asm = String.to_seq asm |> Seq.fold_left (append env) acc |> fun a -> (match a with | Block b -> promoteOrDemote env b | _ -> a)

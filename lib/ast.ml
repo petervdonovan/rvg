@@ -172,9 +172,9 @@ let rec exprToParsedAsm env e =
   | Template (tem, meta) -> (tem
     |> List.map (exprToParsedAsm env)
     |> List.map fst
+    |> List.rev (* FIXME: Performance issue? *)
     |> List.fold_left (Assembly.prependBlock env) {top=""; middle = []; bottom = ""}
-    |> fun b -> Assembly.Block b
-    |> Assembly.promoteToFinishedIfPossible env,
+    |> Assembly.promoteOrDemote env,
     meta)
   | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam definition" e
   | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e

@@ -70,12 +70,12 @@ let%expect_test _ =
   jalr zero t4 END2
   |};
   [%expect{|
-    RType(add, temp-t0, temp-t1, temp-t2)
+    Block(, FinishedBlock(RType(add, temp-t0, temp-t1, temp-t2)
     IArith(addi, temp-a0, temp-a1, 0x66)
     Load(lbu, save-s4, temp-t6, 12)
     Branch(beq, temp-a5, temp-t3, END)
     Jal(jal, Ra, END3)
-    Jalr(jalr, Zero, temp-t4, END2) |}]
+    Jalr(jalr, Zero, temp-t4, END2)),   ) |}]
 
 let evalProgram exprs = exprs |> evalExprListInOrder Environment.empty |> fst
 
@@ -87,13 +87,13 @@ let%expect_test _ = printReducedAst "[lam [] \"\" ]";
   [%expect{| Lam(params=[], value=Name("")) |}]
 
 let%expect_test _ = printReducedAst "[[lam [] {}]]";
-  [%expect{| ParsedAsm(, , ) |}]
+  [%expect{| ParsedAsm(Fragment()) |}]
 
 let%expect_test _ = printReducedAst "[[lam [(x)] {}] {} ]";
-  [%expect{| ParsedAsm(, , ) |}]
+  [%expect{| ParsedAsm(Fragment()) |}]
 
 let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (Ast.exprToParsedAsm (expectAsm Environment.empty) (Ast.Asm (" 12 ", Ast.metaEmpty)))));
-  [%expect {| ParsedAsm( 12 , , ) |}]
+  [%expect {| ParsedAsm(Fragment( 12 )) |}]
 
 let%expect_test _ = Ast.printAst {|
   [[lam [(x)] {
@@ -117,7 +117,7 @@ let%expect_test _ = printReducedAst {|
       addi t0 t1 x
     }] { 12 }]
   |};
-  [%expect {| ParsedAsm(, IArith(addi, temp-t0, temp-t1,  12 ),     ) |}]
+  [%expect {| ParsedAsm(FinishedBlock(IArith(addi, temp-t0, temp-t1,  12 ))) |}]
 
 let%expect_test _ = printReducedAst {|
   [[lam [(x)] {
@@ -128,5 +128,6 @@ let%expect_test _ = printReducedAst {|
   }] { 12 }]
   |};
   [%expect {|
-    ParsedAsm(    , IArith(addi, Zero, Zero,  12 )
-    IArith(slli, temp-t1, temp-t2,  12 ),   ) |}]
+    ParsedAsm(Block(
+        , FinishedBlock(IArith(addi, Zero, Zero,  12 )
+    IArith(slli, temp-t1, temp-t2,  12 )), )) |}]
