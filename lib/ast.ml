@@ -24,6 +24,7 @@ type expr =
   | Template of (template * metadata)
   | Lam of (lam * metadata)
   | LamApplication of (lam_application * metadata)
+  | Def of (define * metadata)
 and template = expr list
 and var = {
   name: string;
@@ -31,12 +32,16 @@ and var = {
 }
 and lam = {
   params: (var * metadata) list;
-  value: expr;
+  lbody: expr list;
   env: expr Environment.t
 }
 and lam_application = {
   lam: expr;
   args: expr list
+}
+and define = {
+  dname: (var * metadata);
+  dvalue: expr list
 }
 
 let rec exprToString (e: expr): string = match e with
@@ -46,17 +51,18 @@ let rec exprToString (e: expr): string = match e with
   | ParsedAsm (asm, _) ->
       funNotation "ParsedAsm" [Assembly.asmToString asm]
   | Template (exprs, _) -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
-  | Lam ({ params; value; _ }, _) -> "Lam(params=[" ^
+  | Lam ({ params; lbody; _ }, _) -> "Lam(params=[" ^
     List.fold_left (^) "" (List.map exprToString (
       List.map (fun v -> Var (v, metaEmpty)) (List.map fst params)
-    )) ^ "], value="
-    ^ (exprToString value)
+    )) ^ "], lbody="
+    ^ (sequenceToString lbody)
     ^ ")"
   | LamApplication ({ lam; args }, _) -> "LamApplication(lam=" ^
     exprToString lam ^ ", args=("
     ^ String.concat ", " (List.map exprToString args)
     ^ "))"
-
+  | Def ({dname; dvalue}, _) -> funNotation "Def" [exprToString (Var dname); sequenceToString dvalue]
+and sequenceToString seq = seq |> List.map exprToString |> String.concat "; "
 
 let rec parseTopLevel acc s =
   List.map fst (
@@ -76,16 +82,12 @@ and parseLam startPos stream =
   let char = CharStream.consumeWhitespace stream in
     match char with
       | Some ('[', s, p) ->
-        let p, _, s' = parseVarList p [] s in
-          let value, s'' = parseExpr s' in (
-            match CharStream.parseToken s'' with
-            | Some ("]", s''', r) -> Lam (
-              { params = p; value = value; env = Environment.empty },
-              metaInitial {startInclusive=startPos; endExclusive=r.endExclusive}
-              ), s'''
-            | Some (tok, _, _) -> raise (ParseFail ("Expected \"]\" to close lam expression, but got " ^ tok ^ " instead"))
-            | None -> raise (ParseFail "Unexpected end of file before close of lam expression")
-          )
+        let p, _, (s': CharStream.t) = parseVarList p [] s in
+          let lbody, s'' = parseExprs [] s' in
+          Lam (
+            { params = p; lbody; env = Environment.empty },
+            metaInitial {startInclusive=startPos; endExclusive=s'.current}
+          ), s''
       | _ -> raise (ParseFail "expected '['")
 and parseVar startInclusive stream =
   let name = CharStream.parseToken stream in
@@ -122,13 +124,17 @@ and parseAsm stream =
       (List.fold_left (fun s c -> (String.make 1 c) ^ s) "" asm),
       metaInitial r,
       s
-and parseExpr stream = let token = CharStream.parseToken stream in
+and parseExpr t s (r: CharStream.range) =
+  if t = "[" then parseList r.startInclusive s
+  else if t = "{" then let (template, r', s) = parseTemplate r.startInclusive s in
+  Template (template, metaInitial r'), s
+  else Name (t, metaInitial r), s
+and parseExprs acc stream = let token = CharStream.parseToken stream in
   match token with
-  | Some ("{", s, r) -> let (template, r', s) = parseTemplate r.startInclusive s in
-    Template (template, metaInitial r'), s
-  | Some ("[", s, r) -> parseList r.startInclusive s
-  | Some (t, s, r) -> Name (t, metaInitial r), s
-  | None -> raise (ParseFail "Expected expression, not end-of-file")
+  | Some ("]", s, _) -> acc, s
+  | Some ("}", _, _) -> raise (ParseFail ("Expected expression or ], not }"))
+  | Some (t, s, r) -> let e, s = parseExpr t s r in parseExprs (List.cons e acc) s
+  | None -> raise (ParseFail ("Expected expression or ], not end-of-file"))
 and parseChecks s = [], s
 and parseLamApplication token stream =
   let t, r = token in
@@ -178,6 +184,7 @@ let rec exprToParsedAsm env e =
     meta)
   | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam definition" e
   | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e
+  | Def _ -> thisIsUnevaluatedOrNotAssembly "def" e
 
 let parseFile ic = parseTopLevel [] (CharStream.inputChannelToSeq ic)
 
@@ -187,27 +194,27 @@ let printAst text: unit =
 
 let%expect_test _ =
 printAst "[lam [] \"\" ]";
-[%expect{| Lam(params=[], value=Name("")) |}]
+[%expect{| Lam(params=[], lbody=Name("")) |}]
 
 let%expect_test _ =
   printAst "[lam [(a) (b) (c)] \"\" ]";
-  [%expect{| Lam(params=[Var(name=a)Var(name=b)Var(name=c)], value=Name("")) |}]
+  [%expect{| Lam(params=[Var(name=a)Var(name=b)Var(name=c)], lbody=Name("")) |}]
 
 let%expect_test _ =
   printAst "[a [lam [] test0] test1 ]";
-  [%expect{| LamApplication(lam=Name(a), args=(Lam(params=[], value=Name(test0)), Name(test1))) |}]
+  [%expect{| LamApplication(lam=Name(a), args=(Lam(params=[], lbody=Name(test0)), Name(test1))) |}]
 
 let%expect_test _ =
   printAst "[a [lam [] [lam [] test0]] test1 ]";
-  [%expect{| LamApplication(lam=Name(a), args=(Lam(params=[], value=Lam(params=[], value=Name(test0))), Name(test1))) |}]
+  [%expect{| LamApplication(lam=Name(a), args=(Lam(params=[], lbody=Lam(params=[], lbody=Name(test0))), Name(test1))) |}]
 
 let%expect_test _ =
   printAst "[[lam [] test2] test3 ]";
-  [%expect{| LamApplication(lam=Lam(params=[], value=Name(test2)), args=(Name(test3))) |}]
+  [%expect{| LamApplication(lam=Lam(params=[], lbody=Name(test2)), args=(Name(test3))) |}]
 
 let%expect_test _ =
   printAst "[f alpha {}]";
   [%expect {| LamApplication(lam=Name(f), args=(Name(alpha), Template())) |}]
 
 let%expect_test _ = printAst "[[lam [(x)] {}] {} ]";
-  [%expect{| LamApplication(lam=Lam(params=[Var(name=x)], value=Template()), args=(Template())) |}]
+  [%expect{| LamApplication(lam=Lam(params=[Var(name=x)], lbody=Template()), args=(Template())) |}]

@@ -31,13 +31,15 @@ let rec evalExpr env e = match e with
     ParsedAsm (Ast.exprToParsedAsm (expectAsm env') tem), env'
   | Ast.Lam _ -> e, env
   | Ast.LamApplication ({ lam; args }, _) ->
-    let lam', env' = evalExpr env lam in
+    (let lam', env' = evalExpr env lam in
       let args', _ = evalExprListInOrder env' args in
         match lam' with
-        | Lam ({ params; value; env }, _) ->
-          let result, _ = evalExpr (bindNames env (List.map fst params) args') value in
-          result, env'
-        | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e))
+        | Lam ({ params; lbody; env = env' }, _) ->
+          let env'' = bindNames env' (List.map fst params) args' in
+          evalSequence env'' lbody, env
+        | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e)))
+  | Ast.Def (define, _) -> (let evaluated = evalSequence env define.dvalue in
+    evaluated, bindNames env [fst define.dname] [evaluated])
 and evalExprListInOrder env exprList =
   let exprs, env = List.fold_left
     ( fun (exprs, env) expr ->
@@ -45,6 +47,10 @@ and evalExprListInOrder env exprList =
         expr' :: exprs, env'
     ) ([], env) exprList
   in List.rev exprs, env
+and evalSequence env exprList =
+  let exprs', _ = evalExprListInOrder env exprList in
+  let head = List.hd exprs' in
+  head
 and expectAsm env name description =
 (if Environment.mem name env
   then match evalExpr env (Environment.find name env) with
@@ -84,7 +90,7 @@ let printReducedAst text =
   |> List.iter print_endline
 
 let%expect_test _ = printReducedAst "[lam [] \"\" ]";
-  [%expect{| Lam(params=[], value=Name("")) |}]
+  [%expect{| Lam(params=[], lbody=Name("")) |}]
 
 let%expect_test _ = printReducedAst "[[lam [] {}]]";
   [%expect{| ParsedAsm(Fragment()) |}]
@@ -104,8 +110,8 @@ let%expect_test _ = Ast.printAst {|
   }] { 12 }]
   |};
   [%expect {|
-    LamApplication(lam=Lam(params=[Var(name=x)], value=Template(Asm(
-        )LamApplication(lam=Lam(params=[Var(name=x)], value=Template(Asm(
+    LamApplication(lam=Lam(params=[Var(name=x)], lbody=Template(Asm(
+        )LamApplication(lam=Lam(params=[Var(name=x)], lbody=Template(Asm(
           addi zero zero x
         ))), args=(Name(x)))Asm(
         x
