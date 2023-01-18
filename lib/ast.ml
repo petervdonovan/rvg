@@ -76,6 +76,7 @@ and parseList startPos stream =
   let token = CharStream.parseToken stream in
     match token with
     | Some ("lam", s, _) -> parseLam startPos s
+    | Some ("def", s, _) -> parseDef startPos s
     | Some (t, s, r) -> parseLamApplication (t, r) s
     | None -> raise (ParseFail "Trailing '['")
 and parseLam startPos stream =
@@ -89,6 +90,15 @@ and parseLam startPos stream =
             metaInitial {startInclusive=startPos; endExclusive=s'.current}
           ), s''
       | _ -> raise (ParseFail "expected '['")
+and parseDef startInclusive stream =
+  let char = CharStream.consumeWhitespace stream in
+  match char with
+  | Some ('(', s, p) ->
+    let dname, s' = parseVar p s in
+    let dvalue, (s'': CharStream.t) = parseExprs [] s' in
+    Def ({dname; dvalue}, metaInitial {startInclusive; endExclusive = s''.current}), s''
+  | Some (bad, _, _) -> raise (ParseFail ("Expected '(', not " ^ (String.make 1 bad)))
+  | None -> raise (ParseFail "Expected Var, not end-of-file")
 and parseVar startInclusive stream =
   let name = CharStream.parseToken stream in
     match name with

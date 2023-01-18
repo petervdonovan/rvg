@@ -45,8 +45,8 @@ and evalExprListInOrder env exprList =
     ( fun (exprs, env) expr ->
       let expr', env' = evalExpr env expr in
         expr' :: exprs, env'
-    ) ([], env) exprList
-  in List.rev exprs, env
+    ) ([], env) (List.rev exprList)
+  in exprs, env
 and evalSequence env exprList =
   let exprs', _ = evalExprListInOrder env exprList in
   let head = List.hd exprs' in
@@ -137,3 +137,12 @@ let%expect_test _ = printReducedAst {|
     ParsedAsm(Block(
         , FinishedBlock(IArith(addi, Zero, Zero,  12 )
     IArith(slli, temp-t1, temp-t2,  12 )), )) |}]
+
+let%expect_test _ = printReducedAst {|
+    [[lam [(x)]
+      [def (a) x]
+      {add t0 t1 t2}
+      a
+    ] {addi zero zero 0} ]
+  |};
+  [%expect]
