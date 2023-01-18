@@ -161,3 +161,11 @@ let%expect_test _ = printReducedAst {|
       {t2}]
   |};
   [%expect{| ParsedAsm(FinishedBlock(RType(sub, temp-t0, temp-t1, temp-t2))) |}]
+
+let%expect_test _ = printReducedAst {|
+    [[lam []
+      [def (x) {t0}]
+      [def (m) [[lam [(x)] [mu [] {lw x 0(a0)}]] {a0}]]
+      [m]]]
+  |};
+  [%expect{| ParsedAsm(FinishedBlock(Load(lw, temp-t0, temp-a0, 0))) |}]
