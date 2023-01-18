@@ -29,7 +29,10 @@ let rec evalExpr env e = match e with
     let exprs', env' = evalExprListInOrder env tem in
     let tem = Ast.Template (exprs', meta) in
     ParsedAsm (Ast.exprToParsedAsm (expectAsm env') tem), env'
-  | Ast.Lam ({params; lbody; _}, meta) -> (Ast.Lam ({ params; lbody; env }, meta)), env
+  | Ast.Lam ({params; lbody; env = prevEnv }, meta) -> (
+    if Environment.is_empty prevEnv
+      then (Ast.Lam ({ params; lbody; env }, meta)), env
+      else e, env)
   | Ast.Mu _ -> e, env
   | Ast.LamApplication ({ lam; args }, _) ->
     (let lam', env' = evalExpr env lam in
@@ -169,3 +172,16 @@ let%expect_test _ = printReducedAst {|
       [m]]]
   |};
   [%expect{| ParsedAsm(FinishedBlock(Load(lw, temp-t0, temp-a0, 0))) |}]
+
+
+let%expect_test _ = printReducedAst {|
+  [[lam []
+    [def (x) {t0}]
+    [def (m) [
+      [lam [(z)]
+        [lam [] {lw z 0(a0)}]]
+      {a0}]]
+    [m]]]
+  |};
+  [%expect{| ParsedAsm(FinishedBlock(Load(lw, temp-a0, temp-a0, 0))) |}]
+
