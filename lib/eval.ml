@@ -11,7 +11,7 @@ let bindNames env params args =
             let p : Ast.var = param in
               Environment.add p.name arg env)
           env params args
-        else raise (EvalFail ("Expected " ^ (string_of_int nparams) ^ " arguments but got " ^ (string_of_int nargs) ^ " arguments." ))
+        else raise (EvalFail ("Expected " ^ (string_of_int nparams) ^ " arguments but got " ^ (string_of_int nargs) ^ " arguments: " ^ (String.concat ", " (List.map Ast.exprToString args) )))
 
 let rec evalExpr env e = match e with
   | Ast.Name (str, _) -> if Environment.mem str env
@@ -29,14 +29,18 @@ let rec evalExpr env e = match e with
     let exprs', env' = evalExprListInOrder env tem in
     let tem = Ast.Template (exprs', meta) in
     ParsedAsm (Ast.exprToParsedAsm (expectAsm env') tem), env'
-  | Ast.Lam _ -> e, env
+  | Ast.Lam ({params; lbody; _}, meta) -> (Ast.Lam ({ params; lbody; env }, meta)), env
+  | Ast.Mu _ -> e, env
   | Ast.LamApplication ({ lam; args }, _) ->
     (let lam', env' = evalExpr env lam in
       let args', _ = evalExprListInOrder env' args in
         match lam' with
-        | Lam ({ params; lbody; env = env' }, _) ->
-          let env'' = bindNames env' (List.map fst params) args' in
-          evalSequence env'' lbody, env
+        | Lam ({ params; lbody; env = env'' }, _) ->
+          let env''' = bindNames env'' (List.map fst params) args' in
+          evalSequence env''' lbody, env
+        | Mu ({ mparams; mbody }, _) ->
+          let env'' = bindNames env' (List.map fst mparams) args' in
+          evalSequence env'' mbody, env
         | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e)))
   | Ast.Def (define, _) -> (let evaluated = evalSequence env define.dvalue in
     evaluated, bindNames env [fst define.dname] [evaluated])
@@ -146,3 +150,14 @@ let%expect_test _ = printReducedAst {|
     ] {addi zero zero 0} ]
   |};
   [%expect{| ParsedAsm(FinishedBlock(IArith(addi, Zero, Zero, 0))) |}]
+
+let%expect_test _ = printReducedAst {|
+    [
+      [
+        [lam [(x)]
+          [def (bound_in_closure) {t0}]
+          [lam [(y)] {sub bound_in_closure x y}]]
+        {t1}]
+      {t2}]
+  |};
+  [%expect{| ParsedAsm(FinishedBlock(RType(sub, temp-t0, temp-t1, temp-t2))) |}]

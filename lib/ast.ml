@@ -23,6 +23,7 @@ type expr =
   | ParsedAsm of (Assembly.t * metadata)
   | Template of (template * metadata)
   | Lam of (lam * metadata)
+  | Mu of (mu * metadata)
   | LamApplication of (lam_application * metadata)
   | Def of (define * metadata)
 and template = expr list
@@ -34,6 +35,10 @@ and lam = {
   params: (var * metadata) list;
   lbody: expr list;
   env: expr Environment.t
+}
+and mu = {
+  mparams: (var * metadata) list;
+  mbody: expr list
 }
 and lam_application = {
   lam: expr;
@@ -51,18 +56,22 @@ let rec exprToString (e: expr): string = match e with
   | ParsedAsm (asm, _) ->
       funNotation "ParsedAsm" [Assembly.asmToString asm]
   | Template (exprs, _) -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
-  | Lam ({ params; lbody; _ }, _) -> "Lam(params=[" ^
-    List.fold_left (^) "" (List.map exprToString (
-      List.map (fun v -> Var (v, metaEmpty)) (List.map fst params)
-    )) ^ "], lbody="
-    ^ (sequenceToString lbody)
-    ^ ")"
+  | Lam (la, _) -> lamMuToString "Lam" {mparams = la.params; mbody = la.lbody}
+  | Mu (la, _) -> lamMuToString "Mu" la
   | LamApplication ({ lam; args }, _) -> "LamApplication(lam=" ^
     exprToString lam ^ ", args=("
     ^ String.concat ", " (List.map exprToString args)
     ^ "))"
   | Def ({dname; dvalue}, _) -> funNotation "Def" [exprToString (Var dname); sequenceToString dvalue]
 and sequenceToString seq = seq |> List.map exprToString |> String.concat "; "
+and lamMuToString name la =
+  let { mparams; mbody } = la in
+  (name ^ "(params=[" ^
+    List.fold_left (^) "" (List.map exprToString (
+      List.map (fun v -> Var (v, metaEmpty)) (List.map fst mparams)
+    )) ^ "], lbody="
+    ^ (sequenceToString mbody)
+    ^ ")")
 
 let rec parseTopLevel acc s =
   List.map fst (
@@ -75,20 +84,20 @@ let rec parseTopLevel acc s =
 and parseList startPos stream =
   let token = CharStream.parseToken stream in
     match token with
-    | Some ("lam", s, _) -> parseLam startPos s
+    | Some ("lam", s, _) -> parseLam false startPos s
+    | Some ("mu", s, _) -> parseLam true startPos s
     | Some ("def", s, _) -> parseDef startPos s
     | Some (t, s, r) -> parseLamApplication (t, r) s
     | None -> raise (ParseFail "Trailing '['")
-and parseLam startPos stream =
+and parseLam isMu startPos stream =
   let char = CharStream.consumeWhitespace stream in
     match char with
       | Some ('[', s, p) ->
         let p, _, (s': CharStream.t) = parseVarList p [] s in
           let lbody, s'' = parseExprs [] s' in
-          Lam (
-            { params = p; lbody; env = Environment.empty },
-            metaInitial {startInclusive=startPos; endExclusive=s'.current}
-          ), s''
+          let meta = metaInitial {startInclusive=startPos; endExclusive=s'.current} in
+          if isMu then Mu ({ mparams = p; mbody = lbody }, meta), s''
+          else Lam ({ params = p; lbody; env = Environment.empty }, meta), s''
       | _ -> raise (ParseFail "expected '['")
 and parseDef startInclusive stream =
   let char = CharStream.consumeWhitespace stream in
@@ -192,7 +201,8 @@ let rec exprToParsedAsm env e =
     |> List.fold_left (Assembly.prependBlock env) {top=""; middle = []; bottom = ""}
     |> Assembly.promoteOrDemote env,
     meta)
-  | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam definition" e
+  | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam" e
+  | Mu _ -> thisIsUnevaluatedOrNotAssembly "mu" e
   | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e
   | Def _ -> thisIsUnevaluatedOrNotAssembly "def" e
 
