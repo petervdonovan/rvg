@@ -143,7 +143,8 @@ let parseJalr env opc s =
     opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; imm = label
   })
   | None -> None
-let tryParse env s =
+let tryParse env str =
+  let s = CharStream.fromString origin str in
   match parseToken s with
   | Some (opcode, s', r) ->
     (let pred = NameSet.mem opcode in (
@@ -160,12 +161,12 @@ let tryParse env s =
 let append env asm char =
   match asm with
   | Fragment s ->
-    let appended = (String.make 1 char) ^ s |> CharStream.fromString origin in
+    let appended = String.make 1 char ^ s in
     (match tryParse env appended with
     | Some instr -> Block {top = ""; middle = [Instruction instr]; bottom = ""}
     | None -> Fragment (s ^ String.make 1 char))
   | Block {top;middle;bottom} ->
-    let appendedBottom = (String.make 1 char) ^ bottom |> CharStream.fromString origin in
+    let appendedBottom = (String.make 1 char) ^ bottom in
     (match tryParse env appendedBottom with
     | Some instr -> Block {
         top;
@@ -192,7 +193,7 @@ let prependBlock env acc prependable =
   | Fragment s -> {top = s ^ acc.top; middle = acc.middle; bottom = acc.bottom}
   | Block {top; middle; bottom} -> (
     let glue = bottom ^ acc.top in
-    match tryParse env (CharStream.fromString origin glue) with
+    match tryParse env glue with
     | Some parsed -> {
         top;
         middle = middle @ [Instruction parsed] @ acc.middle;
@@ -201,7 +202,7 @@ let prependBlock env acc prependable =
     | None -> if String.trim glue = "" then {top; middle = middle @ acc.middle; bottom = acc.bottom} else raise glueFail)
   | FinishedBlock fb ->
     let gluableAcc = if String.trim acc.top = "" then acc else (
-      match tryParse env (CharStream.fromString origin acc.top) with
+      match tryParse env acc.top with
       | Some inst -> {top=""; middle = [Instruction inst] @ acc.middle; bottom = acc.bottom}
       | None -> raise glueFail
     ) in
@@ -213,12 +214,21 @@ let rec promoteOrDemote env b =
     else if b.top = ""
       then if b.bottom = ""
         then FinishedBlock (MetaBlock b.middle)
-      else match tryParse env (CharStream.fromString origin b.bottom) with
+      else match tryParse env b.bottom with
       | Some instr -> promoteOrDemote env
         {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""}
       | None -> Block b
-    else match tryParse env (CharStream.fromString origin b.top) with
+    else match tryParse env b.top with
       | Some instr -> promoteOrDemote env
         {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""}
     | None -> Block b
-let parse acc env asm = String.to_seq asm |> Seq.fold_left (append env) acc |> fun a -> (match a with | Block b -> promoteOrDemote env b | _ -> a)
+let parse acc env asm = String.to_seq asm
+  |> Seq.fold_left (append env) acc
+  |> fun a -> (
+    match a with
+    | Block b -> promoteOrDemote env b
+    | Fragment f -> (match tryParse env f with
+      | Some instr -> FinishedBlock (Instruction instr)
+      | None -> a)
+    | FinishedBlock _ -> a
+  )

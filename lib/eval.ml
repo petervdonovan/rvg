@@ -145,4 +145,4 @@ let%expect_test _ = printReducedAst {|
       a
     ] {addi zero zero 0} ]
   |};
-  [%expect]
+  [%expect{| ParsedAsm(FinishedBlock(IArith(addi, Zero, Zero, 0))) |}]
