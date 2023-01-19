@@ -72,7 +72,18 @@ and lamMuToString name la =
     )) ^ "], lbody="
     ^ (sequenceToString mbody)
     ^ ")")
-
+let metadata e =
+  match e with
+  | Name (_, metadata) -> metadata
+  | Var (_, metadata) -> metadata
+  | Asm (_, metadata) -> metadata
+  | ParsedAsm (_, metadata) -> metadata
+  | Template (_, metadata) -> metadata
+  | Lam (_, metadata) -> metadata
+  | Mu (_, metadata) -> metadata
+  | LamApplication (_, metadata) -> metadata
+  | Def (_, metadata) -> metadata
+let locationToString e = CharStream.rangeToString (metadata e).r
 let rec parseTopLevel s =
     let token = CharStream.parseToken s in (
       match token with

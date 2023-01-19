@@ -10,6 +10,8 @@ type range = {
   startInclusive: position;
   endExclusive: position;
 }
+let posToString p = "line " ^ (string_of_int p.zeroBasedLine) ^ ", col " ^ (string_of_int p.zeroBasedCol)
+let rangeToString r = posToString r.startInclusive ^ " to " ^ (posToString r.endExclusive)
 let origin = {zeroBasedLine = 0; zeroBasedCol = 0}
 let incrementedCol p =
   {zeroBasedLine = p.zeroBasedLine; zeroBasedCol = p.zeroBasedCol+1}

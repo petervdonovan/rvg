@@ -187,3 +187,25 @@ let%expect_test _ = printReducedAst {|
   |};
   [%expect{| ParsedAsm(FinishedBlock(Load(lw, temp-a0, temp-a0, 0))) |}]
 
+let%expect_test _ = (try
+  printReducedAst {|
+  [[
+    [lam [(true) (false)] true]
+    {help}
+    [lam [] [fail {help}]]]]
+  |} with
+    | Std.AssertionFail s -> print_string s
+    | EvalFail s -> print_string s);
+  [%expect{| Expected Lam but got ParsedAsm(Fragment(help)) |}]
+
+
+let%expect_test _ = (try
+  printReducedAst {|
+  [[
+    [lam [(true) (false)] false]
+    {help}
+    [lam [] [fail {help}]]]]
+  |} with
+    | Std.AssertionFail s -> print_string s
+    | EvalFail s -> print_string s);
+  [%expect{| Assertion failed: line 4, col 18 to line 4, col 24 |}]
