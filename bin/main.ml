@@ -1,19 +1,13 @@
-let file = "temp.dat"
+let evalFile env f =
+  let ic = open_in f in
+  try (let evaluated = ic |> Rvg.CharStream.inputChannelToSeq
+      |> Rvg.Ast.parseTopLevel
+      |> Rvg.Eval.evalExpr env |> fst
+    in let result = Rvg.Eval.Environment.add (Filename.remove_extension f)evaluated env
+    in close_in ic; result)
+  with e ->
+    close_in_noerr ic;
+    raise e
 
 let () =
-
-  (* Read file and display the first line *)
-  let ic = open_in file in
-  try
-    print_newline ();
-    (Rvg.Ast.parseTopLevel [] (Rvg.CharStream.inputChannelToSeq ic)) |> Rvg.Eval.evalProgram |> List.map Rvg.Ast.exprToString |> List.iter print_endline;
-
-    (* List.iter print_endline (List.map Rvg.Ast.exprToString (
-      ( Rvg.Ast.parseTopLevel [] (Rvg.ParseUtil.inputChannelToSeq ic))
-    )); *)
-    print_newline();
-  with e ->
-    (* some unexpected exception occurs *)
-    close_in_noerr ic;
-    (* emergency closing *)
-    raise e
+  ignore(Array.fold_left evalFile Rvg.Eval.Environment.empty (Array.sub Sys.argv 1 (Array.length Sys.argv - 1)))

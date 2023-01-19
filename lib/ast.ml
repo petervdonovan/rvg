@@ -73,15 +73,13 @@ and lamMuToString name la =
     ^ (sequenceToString mbody)
     ^ ")")
 
-let rec parseTopLevel acc s =
-  List.map fst (
-    let cs = CharStream.consumeWhitespace s in (
-      match cs with
-      | Some ('[', s', p) -> List.cons (parseList p s') acc
-      | Some (x, _, _) -> raise (ParseFail ("Expected '[', not " ^ String.make 1 x))
-      | None -> acc
-  ))
-and parseList startPos stream =
+let rec parseTopLevel s =
+    let token = CharStream.parseToken s in (
+      match token with
+      | Some (t, s', r) -> fst (parseExpr t s' r)
+      | None -> raise (ParseFail "Expected list expression, not end-of-file")
+  )
+and parseList startPos stream: expr * CharStream.t =
   let token = CharStream.parseToken stream in
     match token with
     | Some ("lam", s, _) -> parseLam false startPos s
@@ -206,11 +204,11 @@ let rec exprToParsedAsm env e =
   | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e
   | Def _ -> thisIsUnevaluatedOrNotAssembly "def" e
 
-let parseFile ic = parseTopLevel [] (CharStream.inputChannelToSeq ic)
+let parseFile ic = parseTopLevel (CharStream.inputChannelToSeq ic)
 
-let getAst text = text |> (CharStream.fromString CharStream.origin) |> (parseTopLevel [])
+let getAst text = text |> (CharStream.fromString CharStream.origin) |> parseTopLevel
 let printAst text: unit =
-  text |> getAst |> List.map exprToString |> List.iter print_endline
+  text |> getAst |> exprToString |> print_endline
 
 let%expect_test _ =
 printAst "[lam [] \"\" ]";

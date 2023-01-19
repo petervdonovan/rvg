@@ -232,3 +232,36 @@ let parse acc env asm = String.to_seq asm
       | None -> a)
     | FinishedBlock _ -> a
   )
+let rec print pasm =
+  match pasm with
+  | Fragment f -> print_string f
+  | Block b ->
+    b.top |> String.trim |> print_string;
+    List.iter printFinishedBlock b.middle;
+    b.bottom |> String.trim |> print_string;
+  | FinishedBlock fb -> printFinishedBlock fb
+and printFinishedBlock fb =
+  match fb with
+  | Instruction i -> print_string (stringifyInstruction i)
+  | MetaBlock mb -> List.iter printFinishedBlock mb
+and stringifyInstruction i =
+  let ($) s reg = s ^ (match reg with
+    | TempReg (s, _) -> s
+    | SaveReg (s, _) -> s
+    | Zero _ -> "zero"
+    | Ra _ -> "ra"
+    | Sp _ -> "sp"
+    | Gp _ -> "gp"
+    | Tp _ -> "tp") in
+  let ($$) s (reg: register) = (s ^ "(" $ reg) ^ ")" in
+  let (<) opc t = "    " ^ (fst opc) ^ " " $ t in
+  let ($) s reg = (s ^ ", ") $ reg in
+  let (=) s imm = s ^ " " ^ (fst imm) in
+  (match i with
+  | RType { opc; rd; rs1; rs2 }   -> opc < rd $ rs1 $ rs2
+  | IArith { opc; rd; rs1; imm }  -> opc < rd $ rs1 = imm
+  | Load { opc; rd; rs1; imm }    -> opc < rd = imm $$ rs1
+  | Store { opc; rs1; rs2; imm }  -> opc < rs2 = imm $$ rs1
+  | Branch { opc; rs1; rs2; imm } -> opc < rs1 $ rs2 = imm
+  | Jal { opc; rd; imm }          -> opc < rd = imm
+  | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 = imm) ^ "\n"

@@ -11,7 +11,7 @@ let bindNames env params args =
             let p : Ast.var = param in
               Environment.add p.name arg env)
           env params args
-        else raise (EvalFail ("Expected " ^ (string_of_int nparams) ^ " arguments but got " ^ (string_of_int nargs) ^ " arguments: " ^ (String.concat ", " (List.map Ast.exprToString args) )))
+        else raise (EvalFail ("Expected " ^ (string_of_int nparams) ^ " arguments but got " ^ (string_of_int nargs) ^ " arguments: " ^ (String.concat ", " (List.map Ast.exprToString args))))
 
 let rec evalExpr env e = match e with
   | Ast.Name (str, _) -> if Environment.mem str env
@@ -34,17 +34,21 @@ let rec evalExpr env e = match e with
       then (Ast.Lam ({ params; lbody; env }, meta)), env
       else e, env)
   | Ast.Mu _ -> e, env
-  | Ast.LamApplication ({ lam; args }, _) ->
-    (let lam', env' = evalExpr env lam in
-      let args', _ = evalExprListInOrder env' args in
-        match lam' with
-        | Lam ({ params; lbody; env = env'' }, _) ->
-          let env''' = bindNames env'' (List.map fst params) args' in
-          evalSequence env''' lbody, env
-        | Mu ({ mparams; mbody }, _) ->
-          let env'' = bindNames env' (List.map fst mparams) args' in
-          evalSequence env'' mbody, env
-        | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e)))
+  | Ast.LamApplication ({ lam; args }, _) -> (
+    let args', env' = evalExprListInOrder env args in
+    (match lam with
+    | Name (s, _) when Std.E.mem s Std.functions ->
+      (Std.E.find s Std.functions) args', env'
+    | _ ->
+    let lam', _ = evalExpr env' lam in
+    match lam' with
+    | Lam ({ params; lbody; env = env'' }, _) ->
+      let env''' = bindNames env'' (List.map fst params) args' in
+      evalSequence env''' lbody, env
+    | Mu ({ mparams; mbody }, _) ->
+      let env'' = bindNames env' (List.map fst mparams) args' in
+      evalSequence env'' mbody, env
+    | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e))))
   | Ast.Def (define, _) -> (let evaluated = evalSequence env define.dvalue in
     evaluated, bindNames env [fst define.dname] [evaluated])
 and evalExprListInOrder env exprList =
@@ -90,11 +94,9 @@ let%expect_test _ =
     Jal(jal, Ra, END3)
     Jalr(jalr, Zero, temp-t4, END2)),   ) |}]
 
-let evalProgram exprs = exprs |> evalExprListInOrder Environment.empty |> fst
-
 let printReducedAst text =
-  text |> Ast.getAst |> evalProgram |> List.map Ast.exprToString
-  |> List.iter print_endline
+  text |> Ast.getAst |> evalExpr Environment.empty |> fst |> Ast.exprToString
+  |> print_endline
 
 let%expect_test _ = printReducedAst "[lam [] \"\" ]";
   [%expect{| Lam(params=[], lbody=Name("")) |}]
