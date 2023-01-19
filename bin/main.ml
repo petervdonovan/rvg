@@ -3,7 +3,9 @@ let evalFile env f =
   try (let evaluated = ic |> Rvg.CharStream.inputChannelToSeq
       |> Rvg.Ast.parseTopLevel
       |> Rvg.Eval.evalExpr env |> fst
-    in let result = Rvg.Eval.Environment.add (Filename.remove_extension f)evaluated env
+    in let result = Rvg.Eval.Environment.add
+      (f |> Filename.basename |> Filename.remove_extension)
+      evaluated env
     in close_in ic; result)
   with e ->
     close_in_noerr ic;
