@@ -78,13 +78,14 @@ let instrToString instr =
 let rec finishedBlockToString fb =
   match fb with
   | Instruction i -> instrToString i
-  | MetaBlock mb -> mb |> List.map finishedBlockToString |> String.concat "\n"
+  | MetaBlock mb -> funNotation "MetaBlock" [
+    mb |> List.map finishedBlockToString |> String.concat "\n"]
 let rec asmToString asm =
   match asm with
   | Fragment s -> funNotation "Fragment" [s]
   | Block {top; middle; bottom} -> funNotation "Block"
     [top; asmToString (FinishedBlock (MetaBlock middle)); bottom]
-  | FinishedBlock fb -> funNotation "FinishedBlock" [finishedBlockToString fb]
+  | FinishedBlock fb -> finishedBlockToString fb
 
 let rec nameToReg env name =
   let str, r = name in

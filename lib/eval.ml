@@ -219,3 +219,16 @@ let%expect_test _ = printReducedAst {|
   [%expect{|
     ParsedAsm(FinishedBlock(Label(START:)
     Jal(jal, Ra, START))) |}]
+
+let%expect_test _ = printReducedAst {|
+  {
+    START:
+    [[lam [(x)] x] {
+
+      START:
+      bne t0 t1 START
+
+    }]
+    jal gp START
+  }
+  |}
