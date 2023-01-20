@@ -27,9 +27,16 @@ type instruction =
   | Jalr of i_format
   | Label of string
 type fragment = string
-type finished_block =
+type label = string
+type nonce = string
+module Noncification = Map.Make(String)
+type finished_block_content =
   | MetaBlock of finished_block list
   | Instruction of instruction
+and finished_block = {
+  content: finished_block_content;
+  provides: nonce Noncification.t
+}
 type block = { top: fragment; middle: finished_block list; bottom: fragment }
 type t =
   | Fragment of fragment
@@ -37,6 +44,18 @@ type t =
   | FinishedBlock of finished_block
 let isEmpty fragment = fragment = ""
 let empty = Fragment ""
+let finishedBlockOf content = {
+  content;
+  provides = match content with
+  | MetaBlock mb -> List.fold_left
+    (Noncification.union (fun _ a _ -> Some a))
+    Noncification.empty
+    (List.map (fun c -> c.provides) mb)
+  | Instruction instr -> (match instr with
+    | Label s -> Noncification.singleton s (nonce ())
+    | _ -> Noncification.empty
+  )
+}
 
 module NameSet = Set.Make(String)
 let strsToNameset strs = List.fold_right NameSet.add strs NameSet.empty
@@ -76,7 +95,7 @@ let instrToString instr =
     funNotation "Jalr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
   | Label s -> "Label(" ^ s ^ ":" ^ ")"
 let rec finishedBlockToString fb =
-  match fb with
+  match fb.content with
   | Instruction i -> instrToString i
   | MetaBlock mb -> funNotation "MetaBlock" [
     mb |> List.map finishedBlockToString |> String.concat "\n"]
@@ -84,9 +103,8 @@ let rec asmToString asm =
   match asm with
   | Fragment s -> funNotation "Fragment" [s]
   | Block {top; middle; bottom} -> funNotation "Block"
-    [top; asmToString (FinishedBlock (MetaBlock middle)); bottom]
+    [top; asmToString (FinishedBlock (finishedBlockOf (MetaBlock middle))); bottom]
   | FinishedBlock fb -> finishedBlockToString fb
-
 let rec nameToReg env name =
   let str, r = name in
   if NameSet.mem str temporaries then TempReg (str, r)
@@ -168,13 +186,13 @@ let append env asm char =
   match asm with
   | Fragment s ->
     (match if char = '\n' then tryParse env s else None with
-    | Some instr -> Block {top = ""; middle = [Instruction instr]; bottom = ""}
+    | Some instr -> Block {top = ""; middle = [Instruction instr |> finishedBlockOf]; bottom = ""}
     | _ -> Fragment (s ^ String.make 1 char))
   | Block {top;middle;bottom} ->
     (match if char = '\n' then tryParse env bottom else None with
     | Some instr when char = '\n' -> Block {
         top;
-        middle = middle @ [Instruction instr];
+        middle = middle @ [Instruction instr |> finishedBlockOf];
         bottom = ""
       }
     | _ -> Block {
@@ -200,14 +218,14 @@ let prependBlock env acc prependable =
     match tryParse env glue with
     | Some parsed -> {
         top;
-        middle = middle @ [Instruction parsed] @ acc.middle;
+        middle = middle @ [Instruction parsed |> finishedBlockOf] @ acc.middle;
         bottom = acc.bottom
       }
     | None -> if String.trim glue = "" then {top; middle = middle @ acc.middle; bottom = acc.bottom} else raise glueFail)
   | FinishedBlock fb ->
     let gluableAcc = if String.trim acc.top = "" then acc else (
       match tryParse env acc.top with
-      | Some inst -> {top=""; middle = [Instruction inst] @ acc.middle; bottom = acc.bottom}
+      | Some inst -> {top=""; middle = [Instruction inst |> finishedBlockOf] @ acc.middle; bottom = acc.bottom}
       | None -> raise glueFail
     ) in
     {top = ""; middle = [fb] @ gluableAcc.middle; bottom = gluableAcc.bottom}
@@ -217,14 +235,14 @@ let rec promoteOrDemote env b =
     if List.length b.middle = 0 then Fragment b.top
     else if b.top = ""
       then if b.bottom = ""
-        then FinishedBlock (MetaBlock b.middle)
+        then FinishedBlock (MetaBlock b.middle |> finishedBlockOf)
       else match tryParse env b.bottom with
       | Some instr -> promoteOrDemote env
-        {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""}
+        {top = ""; middle = b.middle @ [Instruction instr |> finishedBlockOf]; bottom = ""}
       | None -> Block b
     else match tryParse env b.top with
       | Some instr -> promoteOrDemote env
-        {top = ""; middle = b.middle @ [Instruction instr]; bottom = ""}
+        {top = ""; middle = b.middle @ [Instruction instr |> finishedBlockOf]; bottom = ""}
     | None -> Block b
 let parse acc env asm = String.to_seq asm
   |> Seq.fold_left (append env) acc
@@ -232,7 +250,7 @@ let parse acc env asm = String.to_seq asm
     match a with
     | Block b -> promoteOrDemote env b
     | Fragment f -> (match tryParse env f with
-      | Some instr -> FinishedBlock (Instruction instr)
+      | Some instr -> FinishedBlock (Instruction instr |> finishedBlockOf)
       | None -> a)
     | FinishedBlock _ -> a
   )
@@ -241,14 +259,16 @@ let rec print pasm =
   | Fragment f -> print_string f
   | Block b ->
     b.top |> String.trim |> print_string;
-    List.iter printFinishedBlock b.middle;
+    List.iter (printFinishedBlock []) b.middle;
     b.bottom |> String.trim |> print_string;
-  | FinishedBlock fb -> printFinishedBlock fb
-and printFinishedBlock fb =
-  match fb with
-  | Instruction i -> print_string (stringifyInstruction i)
-  | MetaBlock mb -> List.iter printFinishedBlock mb
-and stringifyInstruction i =
+  | FinishedBlock fb -> printFinishedBlock [] fb
+and printFinishedBlock hn fb =
+  let hn' = List.cons fb.provides hn in
+  match fb.content with
+  | Instruction i -> print_string (stringifyInstruction hn' i)
+  | MetaBlock mb -> List.iter (printFinishedBlock hn') mb
+and stringifyInstruction hierarchicalNoncifications i =
+  let noncify label = label ^ "_" ^ Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications) in
   let ($) s reg = s ^ (match reg with
     | TempReg (s, _) -> s
     | SaveReg (s, _) -> s
@@ -261,12 +281,13 @@ and stringifyInstruction i =
   let (<) opc t = "    " ^ (fst opc) ^ " " $ t in
   let ($) s reg = (s ^ ", ") $ reg in
   let (=) s imm = s ^ " " ^ (fst imm) in
+  let (==) s imm = s ^ " " ^ (imm |> fst |> noncify) in
   (match i with
   | RType { opc; rd; rs1; rs2 }   -> opc < rd $ rs1 $ rs2
   | IArith { opc; rd; rs1; imm }  -> opc < rd $ rs1 = imm
   | Load { opc; rd; rs1; imm }    -> opc < rd = imm $$ rs1
   | Store { opc; rs1; rs2; imm }  -> opc < rs2 = imm $$ rs1
-  | Branch { opc; rs1; rs2; imm } -> opc < rs1 $ rs2 = imm
-  | Jal { opc; rd; imm }          -> opc < rd = imm
-  | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 = imm
-  | Label _ -> instrToString i) ^ "\n"
+  | Branch { opc; rs1; rs2; imm } -> opc < rs1 $ rs2 == imm
+  | Jal { opc; rd; imm }          -> opc < rd == imm
+  | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 == imm
+  | Label s -> noncify s ^ ":") ^ "\n"
