@@ -25,6 +25,7 @@ type instruction =
   | Branch of s_or_b_format
   | Jal of u_or_j_format
   | Jalr of i_format
+  | Label of string
 type fragment = string
 type finished_block =
   | MetaBlock of finished_block list
@@ -73,6 +74,7 @@ let instrToString instr =
     funNotation "Jal" ([fst opc] @ List.map regToString [rd] @ [fst imm])
   | Jalr { opc: opcode; rd: register; rs1: register; imm: immediate } ->
     funNotation "Jalr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
+  | Label s -> "Label(" ^ s ^ ":" ^ ")"
 let rec finishedBlockToString fb =
   match fb with
   | Instruction i -> instrToString i
@@ -155,28 +157,29 @@ let tryParse env str =
       else if pred branchInstrs then parseBranch
       else if pred jalInstrs then parseJal
       else if pred jalrInstrs then parseJalr
-      else fun _ _ _ -> None
+      else if String.ends_with ~suffix:":" opcode
+        then fun _ _ _ -> Some (Label (
+          String.sub opcode 0 (String.length opcode - 1)))
+        else fun _ _ _ -> None
     ) env (opcode, r) s')
   | None -> None
 let append env asm char =
   match asm with
   | Fragment s ->
-    let appended = String.make 1 char ^ s in
-    (match tryParse env appended with
+    (match if char = '\n' then tryParse env s else None with
     | Some instr -> Block {top = ""; middle = [Instruction instr]; bottom = ""}
-    | None -> Fragment (s ^ String.make 1 char))
+    | _ -> Fragment (s ^ String.make 1 char))
   | Block {top;middle;bottom} ->
-    let appendedBottom = (String.make 1 char) ^ bottom in
-    (match tryParse env appendedBottom with
-    | Some instr -> Block {
+    (match if char = '\n' then tryParse env bottom else None with
+    | Some instr when char = '\n' -> Block {
         top;
         middle = middle @ [Instruction instr];
         bottom = ""
       }
-    | None -> Block {
+    | _ -> Block {
       top;
       middle;
-      bottom = bottom ^ String.make 1 char
+      bottom = bottom ^ (String.make 1 char)
     })
   | FinishedBlock fb -> Block {
       top = "";
@@ -264,4 +267,5 @@ and stringifyInstruction i =
   | Store { opc; rs1; rs2; imm }  -> opc < rs2 = imm $$ rs1
   | Branch { opc; rs1; rs2; imm } -> opc < rs1 $ rs2 = imm
   | Jal { opc; rd; imm }          -> opc < rd = imm
-  | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 = imm) ^ "\n"
+  | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 = imm
+  | Label _ -> instrToString i) ^ "\n"

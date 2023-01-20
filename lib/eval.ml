@@ -209,3 +209,13 @@ let%expect_test _ = (try
     | Std.AssertionFail s -> print_string s
     | EvalFail s -> print_string s);
   [%expect{| Assertion failed: line 4, col 18 to line 4, col 24 |}]
+
+let%expect_test _ = printReducedAst {|
+  {
+    START:
+    jal ra START
+  }
+  |};
+  [%expect{|
+    ParsedAsm(FinishedBlock(Label(START:)
+    Jal(jal, Ra, START))) |}]
