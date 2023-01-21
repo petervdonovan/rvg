@@ -2,26 +2,6 @@ module Environment = Map.Make(String)
 
 exception EvalFail of string
 
-let bindNames env params args =
-  let nparams = List.length params in
-  let nargs = List.length args in
-  if nparams = nargs
-    then List.fold_left2
-      (fun env param arg ->
-        let p : Ast.var = param in
-          Environment.add p.name arg env)
-      env params args
-    else raise (EvalFail ("Expected " ^ (string_of_int nparams) ^ " arguments but got " ^ (string_of_int nargs) ^ " arguments: " ^ (String.concat ", " (List.map Ast.exprToString args))))
-let lam args params lbody closure _ evalSequence =
-  let bound = bindNames closure (List.map fst params) args in
-    evalSequence bound lbody
-let mu args params lbody _ currentEnv evalSequence =
-  let bound = bindNames currentEnv (List.map fst params) args in
-    evalSequence bound lbody
-let testStd = Environment.empty
-  |> Environment.add "lam" lam
-  |> Environment.add "mu" mu
-
 let rec evalExpr env e = match e with
   | Ast.Name (str, _) -> if Environment.mem str env
     then evalExpr env (Environment.find str env)
@@ -72,6 +52,32 @@ and expectAsm env name description =
   | bad, _ -> raise (Assembly.AsmParseFail (
     description ^ " expected, but found expression " ^ Ast.exprToString bad))
   else Assembly.failWithNoBinding name)
+and bindNames env params args =
+  let nparams = List.length params in
+  let nargs = List.length args in
+  if nparams = nargs
+    then List.fold_left2
+      (fun env param arg ->
+        let p : Ast.var = param in
+        let arg', env' = applyChecks env p arg in
+          Environment.add p.name arg' env')
+      env params args
+    else raise (EvalFail ("Expected " ^ (string_of_int nparams) ^ " arguments but got " ^ (string_of_int nargs) ^ " arguments: " ^ (String.concat ", " (List.map Ast.exprToString args))))
+and applyChecks env (param: Ast.var) arg =
+  List.fold_left (fun (arg, env') (check, meta) ->
+    evalExpr env' (LamApplication ({lam=check; args=[arg]}, meta))
+  ) (arg, env) param.checks
+
+let lam args params lbody closure _ evalSequence =
+  let bound = bindNames closure (List.map fst params) args in
+    evalSequence bound lbody
+let mu args params lbody _ currentEnv evalSequence =
+  let bound = bindNames currentEnv (List.map fst params) args in
+    evalSequence bound lbody
+let testStd = Environment.empty
+  |> Environment.add "lam" lam
+  |> Environment.add "mu" mu
+
 
 let printAsm str = str |> Assembly.parse Assembly.empty (expectAsm Environment.empty)
   |> Assembly.asmToString |> print_endline
@@ -214,3 +220,9 @@ let%expect_test _ = printEndingAsm {|
     START_Kd4gRhlUDG:
         bne t0, t1 START_Kd4gRhlUDG
         jal gp START_5TsUpEQjDf |}]
+
+let%expect_test _ = printReducedAst testStd {|
+  [[lam [(x [lam [(la)] [la]])] x]
+    [lam [] {hello}]]
+  |};
+  [%expect{| ParsedAsm(Fragment(hello)) |}]
