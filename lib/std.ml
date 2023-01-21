@@ -14,19 +14,44 @@ let assertExactlyNArgs n args =
 let assertAtLeastNArgs n args =
   assertNArgs ((>) n) ("at least " ^ (string_of_int n)) args
 
-let print args = (
+let print args _ _ _ _ _ = (
   assertExactlyNArgs 1 args;
   let arg = List.hd args in
   (match arg with
   | Ast.ParsedAsm (pasm, _) -> Assembly.print pasm; arg
   | _ -> raise (IllegalArgument ("Expected ParsedAsm, but got " ^ Ast.exprToString arg)))
 )
-let fail args = (
+let fail args _ _ _ _ _ = (
   assertAtLeastNArgs 1 args;
   args |> List.tl |> List.iter (fun e -> print_endline (Ast.exprToString e));
   raise (AssertionFail ("Assertion failed: " ^ (Ast.locationToString (List.hd args))))
 )
 
-let (functions: (Ast.expr list -> Ast.expr) E.t) = E.empty
+let std: Ast.lam_function E.t = E.empty
   |> E.add "print" print
   |> E.add "fail" fail
+  |> E.add "lam" Eval.lam
+  |> E.add "mu" Eval.mu
+
+let%expect_test _ = (try
+  Eval.printReducedAst std {|
+  [[
+    [lam [(true) (false)] true]
+    {help}
+    [lam [] [fail {help}]]]]
+  |} with
+    | AssertionFail s -> print_string s
+    | Eval.EvalFail s -> print_string s);
+  [%expect{| Expected Lam but got ParsedAsm(Fragment(help)) |}]
+
+
+let%expect_test _ = (try
+  Eval.printReducedAst std {|
+  [[
+    [lam [(true) (false)] false]
+    [lam [] {help}]
+    [lam [] [fail {help}]]]]
+  |} with
+    | AssertionFail s -> print_string s
+    | Eval.EvalFail s -> print_string s);
+  [%expect{| Assertion failed: line 4, col 18 to line 4, col 24 |}]
