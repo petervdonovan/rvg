@@ -30,12 +30,15 @@ type fragment = string
 type label = string
 type nonce = string
 module Noncification = Map.Make(String)
+module CyclesModMap = Map.Make(Int)
 type finished_block_content =
   | MetaBlock of finished_block list
   | Instruction of instruction
 and finished_block = {
   content: finished_block_content;
-  provides: nonce Noncification.t
+  provides: nonce Noncification.t;
+  totalCycles: int option;
+  cyclesMod: int CyclesModMap.t
 }
 type block = { top: fragment; middle: finished_block list; bottom: fragment }
 type t =
@@ -46,7 +49,7 @@ let isEmpty fragment = fragment = ""
 let empty = Fragment ""
 let finishedBlockOf content = {
   content;
-  provides = match content with
+  provides = (match content with
   | MetaBlock mb -> List.fold_left
     (Noncification.union (fun _ a _ -> Some a))
     Noncification.empty
@@ -54,7 +57,9 @@ let finishedBlockOf content = {
   | Instruction instr -> (match instr with
     | Label s -> Noncification.singleton s (nonce ())
     | _ -> Noncification.empty
-  )
+  ));
+  totalCycles = None;
+  cyclesMod = CyclesModMap.empty
 }
 
 module NameSet = Set.Make(String)
