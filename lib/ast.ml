@@ -1,6 +1,6 @@
 open ParseUtil
 
-exception ParseFail of string
+exception ParseFail of string * CharStream.position
 module Environment = Map.Make(String)
 module Attributes = Set.Make(String)
 
@@ -28,7 +28,7 @@ type expr =
 and template = expr list
 and var = {
   name: string;
-  checks: (lam * metadata) list
+  checks: (expr * metadata) list
 }
 and lam = {
   params: (var * metadata) list;
@@ -54,7 +54,7 @@ and lam_function = (expr list (*args*)
 
 let rec exprToString (e: expr): string = match e with
   | Name (s, _) -> "Name(" ^ s ^ ")"
-  | Var ({ name; _ }, _) -> "Var(name=" ^ name ^ ")"
+  | Var ({ name; checks }, _) -> funNotation "Var" (["name=" ^ name] @ (checks |> List.map fst |> List.map exprToString))
   | Asm (s, _) -> "Asm(" ^ s ^ ")"
   | ParsedAsm (asm, _) ->
       funNotation "ParsedAsm" [Assembly.asmToString asm]
@@ -90,7 +90,7 @@ let rec parseTopLevel std s =
   let token = CharStream.parseToken s in (
     match token with
     | Some (t, s', r) -> fst (parseExpr std t s' r)
-    | None -> raise (ParseFail "Expected list expression, not end-of-file")
+    | None -> raise (ParseFail ("Expected list expression, not end-of-file", (s: CharStream.t).current))
   )
 and parseList std startPos stream: expr * CharStream.t =
   let token = CharStream.parseToken stream in
@@ -99,7 +99,7 @@ and parseList std startPos stream: expr * CharStream.t =
     | Some ("mu", s, _) -> parseLam std true startPos s
     | Some ("def", s, _) -> parseDef std startPos s
     | Some (t, s, r) -> parseLamApplication std (t, r) s
-    | None -> raise (ParseFail "Trailing '['")
+    | None -> raise (ParseFail ("Trailing '['", (stream: CharStream.t).current))
 and parseLam std isMu startPos stream =
   let char = CharStream.consumeWhitespace stream in
     match char with
@@ -108,7 +108,7 @@ and parseLam std isMu startPos stream =
           let lbody, s'' = parseExprs std [] s' in
           let meta = metaInitial {startInclusive=startPos; endExclusive=s'.current} in
           Lam ({ params = p; lbody; env = Environment.empty; f = if isMu then Environment.find "mu" std else Environment.find "lam" std }, meta), s''
-      | _ -> raise (ParseFail "expected '['")
+      | _ -> raise (ParseFail ("expected '['", (stream: CharStream.t).current))
 and parseDef std startInclusive stream =
   let char = CharStream.consumeWhitespace stream in
   match char with
@@ -116,24 +116,17 @@ and parseDef std startInclusive stream =
     let dname, s' = parseVar std p s in
     let dvalue, (s'': CharStream.t) = parseExprs std [] s' in
     Def ({dname; dvalue}, metaInitial {startInclusive; endExclusive = s''.current}), s''
-  | Some (bad, _, _) -> raise (ParseFail ("Expected '(', not " ^ (String.make 1 bad)))
-  | None -> raise (ParseFail "Expected Var, not end-of-file")
+  | Some (bad, _, _) -> raise (ParseFail ("Expected '(', not " ^ (String.make 1 bad), (stream: CharStream.t).current))
+  | None -> raise (ParseFail ("Expected Var, not end-of-file", (stream: CharStream.t).current))
 and parseVar std startInclusive stream =
   let name = CharStream.parseToken stream in
     match name with
-    | Some (")", _, _) -> raise (ParseFail "Expected name, not ')'")
+    | Some (")", _, _) -> raise (ParseFail ("Expected name, not ')'", (stream: CharStream.t).current))
     | Some (n, s, _) ->
-      let checks, s' = parseChecks std s in (
-        match CharStream.parseToken s' with
-        | Some(")", s'', r') -> (
-          { name = n; checks = checks },
-          metaInitial {startInclusive; endExclusive=r'.endExclusive}),
-          s''
-        | Some(bad, _, _) -> raise (ParseFail ("Expected ')', not " ^ bad))
-        | None -> raise (ParseFail "Expected ')', not end-of-file")
-      )
-    | None -> raise (ParseFail "Expected name, not end-of-file")
-
+      (let checks, (s': CharStream.t) = parseChecks std s in
+        ({ name = n; checks = checks }, metaInitial {startInclusive; endExclusive=s'.current}),
+        s')
+    | None -> raise (ParseFail ("Expected name, not end-of-file", (stream: CharStream.t).current))
 and parseTemplateRec std stream = let asm, meta, s = parseAsm stream in
   if asm <> "" then let rest, s' = parseTemplateRec std s in
     List.cons (Asm (asm, meta)) rest, s'
@@ -142,8 +135,8 @@ and parseTemplateRec std stream = let asm, meta, s = parseAsm stream in
   | Some ("[", s', _) -> let e, s'' = parseList std s'.current s' in
     let rest, s''' = parseTemplateRec std s'' in
       List.cons e rest, s'''
-  | Some _ -> raise (ParseFail "This should be unreachable")
-  | None -> raise (ParseFail "Unexpected end-of-file before close of template")
+  | Some _ -> raise (ParseFail ("This should be unreachable", (s: CharStream.t).current))
+  | None -> raise (ParseFail ("Unexpected end-of-file before close of template", (s: CharStream.t).current))
 and parseTemplate std startInclusive stream: template * CharStream.range * CharStream.t =
   let template, (s: CharStream.t) = parseTemplateRec std stream in
   template, {startInclusive=startInclusive; endExclusive=s.current}, s
@@ -158,13 +151,20 @@ and parseExpr std t s (r: CharStream.range) =
   else if t = "{" then let (template, r', s) = parseTemplate std r.startInclusive s in
   Template (template, metaInitial r'), s
   else Name (t, metaInitial r), s
-and parseExprs std acc stream = let token = CharStream.parseToken stream in
-  match token with
+and parseExprs std acc stream =
+  match CharStream.parseToken stream with
   | Some ("]", s, _) -> acc, s
-  | Some ("}", _, _) -> raise (ParseFail ("Expected expression or ], not }"))
+  | Some ("}", _, _) -> raise (ParseFail ("Expected expression or ], not }", (stream: CharStream.t).current))
   | Some (t, s, r) -> let e, s = parseExpr std t s r in parseExprs std (List.cons e acc) s
-  | None -> raise (ParseFail ("Expected expression or ], not end-of-file"))
-and parseChecks _ s = [], s
+  | None -> raise (ParseFail ("Expected expression or ], not end-of-file", (stream: CharStream.t).current))
+and parseChecks std s = parseChecksRec std [] s
+and parseChecksRec std acc s =
+  match CharStream.parseToken s with
+  | Some (")", s', _) -> acc, s'
+  | Some (t, s', r) -> let check, s'' = parseExpr std t s' r in
+    let meta = metaInitial {startInclusive=r.startInclusive; endExclusive=s''.current} in
+    parseChecksRec std (List.cons (check, meta) acc) s''
+  | None -> raise (ParseFail ("Expected expression of ), not end-of-file", (s: CharStream.t).current))
 and parseLamApplication std token stream =
   let t, r = token in
   let meta = metaInitial r in
@@ -190,15 +190,15 @@ and parseArgs std stream accumulator =
       else if t = "{" then let tem, r, ss' = parseTemplate std r.startInclusive s in Template (tem, metaInitial r), ss'
       else Name (t, metaInitial r), s
     in parseArgs std s' (nextExpr :: accumulator)
-  | None -> raise (ParseFail "Expected arg or ']', not end-of-file")
+  | None -> raise (ParseFail ("Expected arg or ']', not end-of-file", (stream: CharStream.t).current))
 and parseVarList std startInclusive accumulator stream =
   let c = CharStream.consumeWhitespace stream in
   match c with
   | Some (']', s, p) -> List.rev accumulator, (metaInitial {startInclusive; endExclusive=CharStream.incrementedCol p}), s
   | Some ('(', s, p) -> let v, s' = parseVar std p s in
     parseVarList std startInclusive (v :: accumulator) s'
-  | Some (x, _, _) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x))
-  | None -> raise (ParseFail "Expected ']' or '(', not end-of-file")
+  | Some (x, _, p) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x, p))
+  | None -> raise (ParseFail ("Expected ']' or '(', not end-of-file", (stream: CharStream.t).current))
 let thisIsUnevaluatedOrNotAssembly description e =
   raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly"))
 let rec exprToParsedAsm env e =
@@ -217,7 +217,10 @@ let rec exprToParsedAsm env e =
   | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam" e
   | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e
   | Def _ -> thisIsUnevaluatedOrNotAssembly "def" e
-
+let handleParseFail runnable = try runnable () with e -> match e with
+  | ParseFail (s, (p: CharStream.position)) -> print_endline (
+    "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s); raise e
+  | _ -> raise e
 let parseFile std ic = parseTopLevel std (CharStream.inputChannelToSeq ic)
 let testStd = Environment.empty
   |> Environment.add "lam" (fun _ _ _ _ _ _ -> Template ([], metaEmpty))
@@ -252,3 +255,6 @@ let%expect_test _ =
 
 let%expect_test _ = printAst "[[lam [(x)] {}] {} ]";
   [%expect{| LamApplication(lam=Lam(params=[Var(name=x)], lbody=Template()), args=(Template())) |}]
+
+let%expect_test _ = handleParseFail (fun () -> printAst "[[lam [(x alpha [lam [(x)] x])] {}] {} ]");
+  [%expect{| LamApplication(lam=Lam(params=[Var(name=x, Lam(params=[Var(name=x)], lbody=Name(x)), Name(alpha))], lbody=Template()), args=(Template())) |}]
