@@ -2,11 +2,11 @@
 [def (a [addattr {clobber}]) {mouse}]
 [def (b) {mouse}]
 [if [[hasattr {clobber}] a]
-  [lam [] [print {a ok
-}]]
-  [lam [] [fail {a has attr clobber!}]]]
+  [print {a ok
+}]
+  [fail {a has attr clobber!}]]
 [if [[hasattr {clobber}] b]
-  [lam [] [fail {b does not have attr clobber!}]]
-  [lam [] [print {b ok
-}]]]
+  [fail b {b does not have attr clobber!}]
+  [print {b ok
+}]]
 ]]

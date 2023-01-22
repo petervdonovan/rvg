@@ -50,7 +50,8 @@ and lam_function = (expr list (*args*)
   -> expr list (*lbody*)
   -> expr Environment.t (*closure*)
   -> expr Environment.t (*current env*)
-  -> (expr Environment.t -> expr list -> expr)
+  -> (expr Environment.t -> expr list -> expr) (*evalSequence*)
+  -> CharStream.range (*lam application expression range*)
   -> expr)
 
 let rec exprToString (e: expr): string = match e with
@@ -75,7 +76,8 @@ and lamMuToString la =
     )) ^ "], lbody="
     ^ (sequenceToString lbody)
     ^ ")")
-let locationToString e = CharStream.rangeToString (snd e).r
+let rangeOf e = (snd e).r
+let locationToString e = CharStream.rangeToString (rangeOf e)
 
 let rec parseTopLevel std s =
   let token = CharStream.parseToken s in (
@@ -216,8 +218,8 @@ let handleParseFail runnable = try runnable () with e -> match e with
   | _ -> raise e
 let parseFile std ic = parseTopLevel std (CharStream.inputChannelToSeq ic)
 let testStd = Environment.empty
-  |> Environment.add "lam" (fun _ _ _ _ _ _ -> Template [], metaEmpty)
-  |> Environment.add "mu" (fun _ _ _ _ _ _ -> Template [], metaEmpty)
+  |> Environment.add "lam" (fun _ _ _ _ _ _ _ -> Template [], metaEmpty)
+  |> Environment.add "mu" (fun _ _ _ _ _ _ _ -> Template [], metaEmpty)
 let getAst testStd text = text |> (CharStream.fromString CharStream.origin) |> parseTopLevel testStd
 let printAst text: unit =
   text |> getAst testStd |> exprToString |> print_endline

@@ -7,6 +7,15 @@
   $ dune exec -- ../../bin/main.exe tokens 0.rvg
   {"kind": "function", "modifier": "defaultLibrary", "startInclusive": [0, 2], "endExclusive": [0, 7] }
   $ dune exec -- ../../bin/main.exe stdlib.rvg 2.rvg
+  a ok
+  b ok
   $ dune exec -- ../../bin/main.exe stdlib.rvg 3.rvg
-  Expected lam of width 2: line 11, col 12 to line 11, col 42
-  Assertion failed: line 2, col 20 to line 2, col 30
+  good 0
+  good 1
+  Expected lam of 2 parameters: line 11, col 12 to line 11, col 47
+  Assertion failed: line 6, col 20 to line 6, col 30
+  $ dune exec -- ../../bin/main.exe stdlib.rvg 4.rvg
+  testing lam!
+  executing identity
+  Expected lam of 1 parameters: line 11, col 12 to line 11, col 47
+  Assertion failed: line 7, col 5 to line 7, col 41

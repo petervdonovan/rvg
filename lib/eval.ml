@@ -1,14 +1,14 @@
 module Environment = Map.Make(String)
 
-exception EvalFail of string
+exception EvalFail of string * CharStream.range
 
 let rec evalExpr env e = match e with
   | Ast.Name str, _ -> if Environment.mem str env
     then evalExpr env (Environment.find str env)
-    else raise (EvalFail ("Unbound name: " ^ str))
+    else raise (EvalFail ("Unbound name: " ^ str, Ast.rangeOf e))
   | Ast.Var _, _ -> raise (EvalFail (
     "A parameter is not an expression, but tried to evaluate "
-    ^ (Ast.exprToString e)))
+    ^ (Ast.exprToString e), Ast.rangeOf e))
   | Ast.ParsedAsm _, _ -> e, env
   | Ast.Asm asm, meta -> (Ast.ParsedAsm
       (Assembly.parse Assembly.empty (expectAsm env) asm),
@@ -28,10 +28,10 @@ let rec evalExpr env e = match e with
     let lam', _ = evalExpr env' lam in
     match lam' with
     | Lam { params; lbody; env = env''; f }, _ ->
-      f args' params lbody env'' env' evalSequence, env'
-    | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e))))
+      f args' params lbody env'' env' evalSequence (Ast.rangeOf e), env'
+    | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e, Ast.rangeOf e))))
   | Ast.Def define, _ -> (let evaluated = evalSequence env define.dvalue in
-    evaluated, bindNames env [fst define.dname] [evaluated])
+    evaluated, bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
 and evalExprListInOrder env exprList =
   let exprs, env = List.fold_left
     ( fun (exprs, env) expr ->
@@ -53,7 +53,7 @@ and expectAsm env name description =
   | bad, _ -> raise (Assembly.AsmParseFail (
     description ^ " expected, but found expression " ^ Ast.exprToString bad))
   else Assembly.failWithNoBinding name)
-and bindNames env params args =
+and bindNames env params args r =
   let nparams = List.length params in
   let nargs = List.length args in
   if nparams = nargs
@@ -63,17 +63,17 @@ and bindNames env params args =
         let arg', env' = applyChecks env p arg in
           Environment.add p.name arg' env')
       env params args
-    else raise (EvalFail ("Expected " ^ (string_of_int nparams) ^ " arguments but got " ^ (string_of_int nargs) ^ " arguments: " ^ (String.concat ", " (List.map Ast.exprToString args))))
+    else raise (EvalFail ("Expected " ^ (string_of_int nparams) ^ " arguments corresponding to parameters " ^ (String.concat ", " (List.map (fun (v: Ast.var) -> v.name) params)) ^ " but got " ^ (string_of_int nargs) ^ " arguments: " ^ (String.concat ", " (List.map Ast.exprToString args)), r))
 and applyChecks env (param: Ast.var) arg =
   List.fold_left (fun (arg, env') (check, meta) ->
     evalExpr env' (LamApplication {lam=check; args=[arg]}, meta)
   ) (arg, env) param.checks
 
-let lam args params lbody closure _ evalSequence =
-  let bound = bindNames closure (List.map fst params) args in
+let lam args params lbody closure _ evalSequence r =
+  let bound = bindNames closure (List.map fst params) args r in
     evalSequence bound lbody
-let mu args params lbody _ currentEnv evalSequence =
-  let bound = bindNames currentEnv (List.map fst params) args in
+let mu args params lbody _ currentEnv evalSequence r =
+  let bound = bindNames currentEnv (List.map fst params) args r in
     evalSequence bound lbody
 let testStd = Environment.empty
   |> Environment.add "lam" lam

@@ -21,5 +21,8 @@ let () =
     (match e with
     | Rvg.Ast.ParseFail (s, (p: Rvg.CharStream.position)) -> print_endline (
       "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s)
+    | Rvg.Eval.EvalFail (s, r) -> print_endline (
+      (Rvg.CharStream.rangeToString r) ^ ": " ^ s
+    )
     | Rvg.Std.AssertionFail s -> print_endline s
     | _ -> raise e)

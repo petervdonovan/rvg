@@ -2,13 +2,13 @@
 
 [def (id) [lam [(x)] x]]
 
-[def (if) [lam [(condition) (then) (else)] [
-  [condition then else]]]]
+[def (if) [lam [(condition) (then) (else)]
+  [def (selected) [condition then else]]
+  [selected]]]
 
 [def (lam!) [lam [(k)] [lam [(l)]
-  [if
-    [[islam k] l]
+  [if [[lam? k] l]
     [lam [] l]
-    [fail l {Expected lam of width [id k]}]]]]]
+    [fail l {Expected lam of [id k] parameters}]]]]]
 
 [program]]

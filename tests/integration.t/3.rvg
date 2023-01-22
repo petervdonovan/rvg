@@ -1,4 +1,8 @@
 [stdlib [mu []
-[def (a [lam! {1}]) [lam [(b)] b]]
-[def (c [lam! {2}]) [lam [(b)] b]]
+[[print {good 0
+}]]
+[if [lam [(a) (b)] b] [print {fail!}] [print {good 1
+}]]
+[def (a [lam! {1}]) [lam [(b)] {this should not fail} b]]
+[def (c [lam! {2}]) [lam [(b)] {this should fail} b]]
 ]]
