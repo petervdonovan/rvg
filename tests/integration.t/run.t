@@ -19,3 +19,7 @@
   executing identity
   Expected lam of 1 parameters: line 11, col 12 to line 11, col 47
   Assertion failed: line 7, col 5 to line 7, col 41
+  $ dune exec -- ../../bin/main.exe stdlib.rvg 5.rvg
+  curried successfully
+  first thing to print
+  second thing to print

@@ -101,11 +101,12 @@ let lamOf paramChecks _ _ closure _ _ _ = (
       (let actualNParams = List.length l.params in
       (if actualNParams <> nParams then raise (AssertionFail ("Expected " ^ (string_of_int nParams) ^ " params, not " ^ (string_of_int actualNParams) ^ " " ^ Ast.locationToString checkee))));
       let ({params; lbody; env; f}: Ast.lam) = l in
-      let instrumented = Ast.Lam {params; lbody; env; f=fun args params lbody closure' currentEnv evalSequence -> (
+      let instrumented = Ast.Lam {params; lbody; env; f=fun args params lbody closure' currentEnv evalSequence r -> (
+          (if List.length args <> nParams then raise (AssertionFail ("Wrong number of args: " ^ CharStream.rangeToString r)));
           let args' = List.map2
             (fun paramCheck arg -> Eval.evalExpr closure (Ast.LamApplication {lam=paramCheck; args=[arg]}, snd arg))
             paramChecks args |> List.map fst
-          in f args' params lbody closure' currentEnv evalSequence
+          in f args' params lbody closure' currentEnv evalSequence r
         )}
       in instrumented, meta)
     | _ -> raise (AssertionFail ("Expected lam " ^ Ast.locationToString checkee))

@@ -1,0 +1,12 @@
+[stdlib [mu []
+[def (currier [-> [lamof [lam! {2}] id] [lam! {1}]]) [lam [(l) (arg0)]
+  [lam [(arg1)] [l arg0 arg1]]]]
+[def (curried) [currier
+  [lam [(a) (b)] [[print a]] [[print b]]]
+  {first thing to print
+}]]
+[[print {curried successfully
+}]]
+[curried {second thing to print
+}]
+]]
