@@ -7,5 +7,4 @@ let nonce () =
   fun s -> let b = Buffer.create 16 in
   Seq.iter (Buffer.add_char b) s;
   Buffer.contents b)
-
 let%expect_test _ = (Random.init 0; print_string (nonce ())); [%expect{| RNYh2Z6mVs |}]

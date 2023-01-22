@@ -18,7 +18,7 @@ let print args _ _ _ _ _ = (
   assertExactlyNArgs 1 args;
   let arg = List.hd args in
   (match arg with
-  | Ast.ParsedAsm (pasm, _) -> Assembly.print pasm; arg
+  | Ast.ParsedAsm (pasm, _) -> if Array.get Sys.argv 1 <> "tokens" then Assembly.print pasm; arg
   | _ -> raise (IllegalArgument ("Expected ParsedAsm, but got " ^ Ast.exprToString arg)))
 )
 let fail args _ _ _ _ _ = (

@@ -171,7 +171,8 @@ and parseLamApplication std token stream =
   let lam, s' = (if t = "["
     then (parseList std r.startInclusive stream)
     else if Environment.mem t std then
-      Lam ({params=[]; lbody=[]; env=Environment.empty; f=Environment.find t std}, meta), stream
+      (CharStream.announceToken "function" "defaultLibrary" r;
+      Lam ({params=[]; lbody=[]; env=Environment.empty; f=Environment.find t std}, meta), stream)
     else Name (t, meta), stream)
   in
     let args, (s'': CharStream.t) = parseArgs std s' [] in

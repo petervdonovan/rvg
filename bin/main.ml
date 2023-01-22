@@ -16,4 +16,8 @@ let evalFile env f =
     raise e
 
 let () =
-  ignore(Array.fold_left evalFile Rvg.Eval.Environment.empty (Array.sub Sys.argv 1 (Array.length Sys.argv - 1)))
+  ignore(
+    Array.fold_left
+    (fun env f -> if String.ends_with ~suffix:".rvg" f then evalFile env f else env)
+    Rvg.Eval.Environment.empty
+    (Array.sub Sys.argv 1 (Array.length Sys.argv - 1)))

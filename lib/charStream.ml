@@ -115,3 +115,6 @@ let get3TokensWithThirdTokenInParens s =
       else Some (regR, immR, rs2)
     | None -> None)
   | None -> None
+let announceToken kind modifier (r: range) =
+  let posToList (p: position) = "[" ^ (string_of_int p.zeroBasedLine) ^ ", " ^ (string_of_int p.zeroBasedCol) ^ "]" in
+  if (Array.get Sys.argv 1 = "tokens") then print_endline ("{\"kind\": \"" ^ kind ^ "\", \"modifier\": \"" ^ modifier ^ "\", \"startInclusive\": " ^ posToList r.startInclusive ^ ", \"endExclusive\": " ^ posToList r.endExclusive ^ " }")

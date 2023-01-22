@@ -4,3 +4,5 @@ _build/
 **/temp/
 _opam/
 .vscode/
+notes.md
+*.code-workspace
