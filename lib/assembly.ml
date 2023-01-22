@@ -25,6 +25,7 @@ type instruction =
   | Branch of s_or_b_format
   | Jal of u_or_j_format
   | Jalr of i_format
+  | UType of u_or_j_format
   | Label of string
 type fragment = string
 type label = string
@@ -98,6 +99,8 @@ let instrToString instr =
     funNotation "Jal" ([fst opc] @ List.map regToString [rd] @ [fst imm])
   | Jalr { opc: opcode; rd: register; rs1: register; imm: immediate } ->
     funNotation "Jalr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
+  | UType { opc: opcode; rd: register; imm: immediate } ->
+    funNotation "UType" ([fst opc] @ [regToString rd] @ [fst imm] )
   | Label s -> "Label(" ^ s ^ ":" ^ ")"
 let rec finishedBlockToString fb =
   match fb.content with
@@ -129,46 +132,121 @@ let asmParseFail formatDescription s =
   raise (AsmParseFail ("Instruction \"" ^ (charSeqToString s) ^ "\" does not follow the instruction syntax for " ^ formatDescription))
 let parseR env opc s =
   match get3Tokens s with
-  | Some (rd, rs1, rs2, _) -> Some (RType { opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2 })
+  | Some (rd, rs1, rs2, _) -> Some (Instruction(RType { opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2 }))
   | None -> None
 let parseI env opc s =
     match get3Tokens s with
-    | Some (rd, rs1, imm, _) -> Some (IArith {
+    | Some (rd, rs1, imm, _) -> Some (Instruction(IArith {
       opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1;
       imm = resolveNumericalImm env imm
-    })
+    }))
     | None -> None
 let parseLoad env opc s =
   match get3TokensWithThirdTokenInParens s with
-  | Some (rd, imm, rs1) -> Some (Load {
+  | Some (rd, imm, rs1) -> Some (Instruction(Load {
     opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1;
     imm = resolveNumericalImm env imm
-  })
+  }))
   | None -> None
 let parseStore env opc s =
   match get3TokensWithThirdTokenInParens s with
-  | Some (rs2, imm, rs1) -> Some (Store {
+  | Some (rs2, imm, rs1) -> Some (Instruction(Store {
     opc = opc; rs2 = nameToReg env rs2; rs1 = nameToReg env rs1;
     imm = resolveNumericalImm env imm
-  })
+  }))
   | None -> None
 let parseBranch env opc s =
   match get3Tokens s with
-  | Some (rs1, rs2, label, _) -> Some (Branch {
+  | Some (rs1, rs2, label, _) -> Some (Instruction(Branch {
     opc = opc; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2;
     imm = label
-  })
+  }))
   | None -> None
 let parseJal env opc s =
   match get2Tokens s with
-  | Some (rd, label, _) -> Some (Jal { opc = opc; rd = nameToReg env rd; imm = label })
+  | Some (rd, label, _) -> Some (Instruction(Jal { opc = opc; rd = nameToReg env rd; imm = label }))
   | None -> None
 let parseJalr env opc s =
   match get3Tokens s with
-  | Some (rd, rs1, label, _) -> Some (Jalr {
+  | Some (rd, rs1, label, _) -> Some (Instruction(Jalr {
     opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; imm = label
-  })
+  }))
   | None -> None
+let parseU env opc s =
+  match get2Tokens s with
+  | Some (rd, label, _) -> Some (Instruction(UType { opc = opc; rd = nameToReg env rd; imm = label }))
+  | None -> None
+let parseBxxz env opc s = (
+  let opcs, r = opc in
+  match get2Tokens s with
+  | Some (rs1, label, _) -> Some (Instruction(Branch {
+      opc = if opcs = "beqz" then "beq", r else "bnez", r;
+      rs1 = nameToReg env rs1;
+      rs2=Zero r;
+      imm=label
+    }))
+  | None -> None)
+let parseJ _ opc s =
+  let _, r = opc in
+  match CharStream.parseToken s with
+  | Some (label, _, r') -> Some (Instruction(Jal {
+    opc = "jal", r;
+    rd = Zero r;
+    imm = label, r'
+  }))
+  | None -> None
+let parseJr env opc s =
+  let _, r = opc in
+  match CharStream.parseToken s with
+  | Some (rs1s, _, r') -> Some (Instruction(Jalr {
+    opc = "jalr", r;
+    rd = Zero r;
+    rs1 = nameToReg env (rs1s, r');
+    imm = "0", r
+  }))
+  | None -> None
+let parseLa _ _ _ = raise (AsmParseFail "la is not currently supported")
+let parseLi env opc s =
+  let _, r = opc in
+  match get2Tokens s with
+  | Some (rd, (imm, immr), _) -> (match int_of_string_opt imm with
+    | None -> None
+    | Some k ->
+      let upper = k / 4096 in
+      let lower = k - 4096 * upper in
+      Some (MetaBlock (
+        if upper = 0 then [] else [finishedBlockOf (Instruction(UType {opc="lui", r; rd=nameToReg env rd; imm=string_of_int upper, immr}))]
+       @ (if lower = 0 then [] else [finishedBlockOf (Instruction(IArith {opc="addi", r; rd=nameToReg env rd; rs1 = Zero r; imm=string_of_int lower, immr}))]))))
+  | None -> None
+let parseMv env opc s =
+  let _, r = opc in
+  match get2Tokens s with
+  | None -> None
+  | Some (rd, rs1, _) -> Some (Instruction(IArith({
+    opc="addi", r; rd=nameToReg env rd; rs1 = nameToReg env rs1; imm="0", r
+  })))
+let parseNeg env opc s =
+  let _, r = opc in
+  match get2Tokens s with
+  | None -> None
+  | Some (rd, rs1, _) -> Some (Instruction(RType({
+    opc="sub", r; rd=nameToReg env rd; rs1 = nameToReg env rs1; rs2=Zero r
+  })))
+let parseNop _ opc _ =
+  let _, r = opc in Some(Instruction(IArith({
+    opc="addi", r; rd=Zero r; rs1 = Zero r; imm="0", r
+  })))
+let parseNot env opc s =
+  let _, r = opc in
+  match get2Tokens s with
+  | None -> None
+  | Some (rd, rs1, _) -> Some (Instruction(IArith({
+    opc="xori", r; rd=nameToReg env rd; rs1 =nameToReg env rs1; imm="-1", r
+  })))
+let parseRet _ opc _ =
+  let _, r = opc in Some(Instruction(Jalr({
+    opc="jalr", r; rd=Zero r; rs1=Ra r; imm="0", r
+  })))
 let tryParse env str =
   let s = CharStream.fromString origin str in
   match parseToken s with
@@ -181,9 +259,20 @@ let tryParse env str =
       else if pred branchInstrs then parseBranch
       else if pred jalInstrs then parseJal
       else if pred jalrInstrs then parseJalr
+      else if pred (strsToNameset ["auipc"; "lui"]) then parseU
+      else if opcode = "beqz" || opcode = "bnez" then parseBxxz
+      else if opcode = "j" then parseJ
+      else if opcode = "jr" then parseJr
+      else if opcode = "la" then parseLa
+      else if opcode = "li" then parseLi
+      else if opcode = "mv" then parseMv
+      else if opcode = "neg" then parseNeg
+      else if opcode = "nop" then parseNop
+      else if opcode = "not" then parseNot
+      else if opcode = "ret" then parseRet
       else if String.ends_with ~suffix:":" opcode
-        then fun _ _ _ -> Some (Label (
-          String.sub opcode 0 (String.length opcode - 1)))
+        then fun _ _ _ -> Some (Instruction(Label (
+          String.sub opcode 0 (String.length opcode - 1))))
         else fun _ _ _ -> None
     ) env (opcode, r) s')
   | None -> None
@@ -191,13 +280,13 @@ let append env asm char =
   match asm with
   | Fragment s ->
     (match if char = '\n' then tryParse env s else None with
-    | Some instr -> Block {top = ""; middle = [Instruction instr |> finishedBlockOf]; bottom = ""}
+    | Some instr -> Block {top = ""; middle = [instr |> finishedBlockOf]; bottom = ""}
     | _ -> Fragment (s ^ String.make 1 char))
   | Block {top;middle;bottom} ->
     (match if char = '\n' then tryParse env bottom else None with
     | Some instr when char = '\n' -> Block {
         top;
-        middle = middle @ [Instruction instr |> finishedBlockOf];
+        middle = middle @ [instr |> finishedBlockOf];
         bottom = ""
       }
     | _ -> Block {
@@ -223,14 +312,14 @@ let prependBlock env acc prependable =
     match tryParse env glue with
     | Some parsed -> {
         top;
-        middle = middle @ [Instruction parsed |> finishedBlockOf] @ acc.middle;
+        middle = middle @ [parsed |> finishedBlockOf] @ acc.middle;
         bottom = acc.bottom
       }
     | None -> if String.trim glue = "" then {top; middle = middle @ acc.middle; bottom = acc.bottom} else raise glueFail)
   | FinishedBlock fb ->
     let gluableAcc = if String.trim acc.top = "" then acc else (
       match tryParse env acc.top with
-      | Some inst -> {top=""; middle = [Instruction inst |> finishedBlockOf] @ acc.middle; bottom = acc.bottom}
+      | Some inst -> {top=""; middle = [inst |> finishedBlockOf] @ acc.middle; bottom = acc.bottom}
       | None -> raise glueFail
     ) in
     {top = ""; middle = [fb] @ gluableAcc.middle; bottom = gluableAcc.bottom}
@@ -242,12 +331,12 @@ let rec promoteOrDemote env b =
       then if b.bottom = ""
         then FinishedBlock (MetaBlock b.middle |> finishedBlockOf)
       else match tryParse env b.bottom with
-      | Some instr -> promoteOrDemote env
-        {top = ""; middle = b.middle @ [Instruction instr |> finishedBlockOf]; bottom = ""}
+      | Some inst -> promoteOrDemote env
+        {top = ""; middle = b.middle @ [inst |> finishedBlockOf]; bottom = ""}
       | None -> Block b
     else match tryParse env b.top with
       | Some instr -> promoteOrDemote env
-        {top = ""; middle = b.middle @ [Instruction instr |> finishedBlockOf]; bottom = ""}
+        {top = ""; middle = b.middle @ [instr |> finishedBlockOf]; bottom = ""}
     | None -> Block b
 let parse acc env asm = String.to_seq asm
   |> Seq.fold_left (append env) acc
@@ -255,7 +344,7 @@ let parse acc env asm = String.to_seq asm
     match a with
     | Block b -> promoteOrDemote env b
     | Fragment f -> (match tryParse env f with
-      | Some instr -> FinishedBlock (Instruction instr |> finishedBlockOf)
+      | Some instr -> FinishedBlock (instr |> finishedBlockOf)
       | None -> a)
     | FinishedBlock _ -> a
   )
@@ -295,4 +384,5 @@ and stringifyInstruction hierarchicalNoncifications i =
   | Branch { opc; rs1; rs2; imm } -> opc < rs1 $ rs2 == imm
   | Jal { opc; rd; imm }          -> opc < rd == imm
   | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 == imm
+  | UType {opc; rd; imm}          -> opc < rd == imm
   | Label s -> noncify s ^ ":") ^ "\n"

@@ -226,3 +226,26 @@ let%expect_test _ = printReducedAst testStd {|
     [lam [] {hello}]]
   |};
   [%expect{| ParsedAsm(Fragment(hello)) |}]
+
+let%expect_test _ = printReducedAst testStd {|
+  {
+    lui t1 0x40000
+    auipc a0 0x12345
+    li t1 0x80000001
+    mv t0 t1
+    neg t0 t1
+    nop
+    not t0 t1
+    ret
+  }
+|};
+  [%expect {|
+    ParsedAsm(MetaBlock(UType(lui, temp-t1, 0x40000)
+    UType(auipc, temp-a0, 0x12345)
+    MetaBlock(UType(lui, temp-t1, 524288)
+    IArith(addi, temp-t1, Zero, 1))
+    IArith(addi, temp-t0, temp-t1, 0)
+    RType(sub, temp-t0, temp-t1, Zero)
+    IArith(addi, Zero, Zero, 0)
+    IArith(xori, temp-t0, temp-t1, -1)
+    Jalr(jalr, Zero, Ra, 0))) |}]

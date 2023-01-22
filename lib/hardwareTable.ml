@@ -8,4 +8,5 @@ let cyclesOf i =
   | Branch _ -> None
   | Jal _ -> None
   | Jalr _ -> None
+  | UType _ -> Some 1
   | Label _ -> None
