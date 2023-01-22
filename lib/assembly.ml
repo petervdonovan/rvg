@@ -66,7 +66,7 @@ let finishedBlockOf content = {
 module NameSet = Set.Make(String)
 let strsToNameset strs = List.fold_right NameSet.add strs NameSet.empty
 let rTypeInstrs: NameSet.t = strsToNameset ["add"; "sub"; "and"; "or"; "xor"; "sll"; "srl"; "sra"; "slt"; "sltu"]
-let iTypeInstrs = strsToNameset ["addi"; "ori"; "xori"; "slli"; "srli"; "srai"; "slti"; "sltiu"]
+let iTypeInstrs = strsToNameset ["addi"; "ori"; "xori"; "slli"; "srli"; "srai"; "slti"; "sltiu"; "csrrw"; "csrrs"; "csrrc"; "csrrwi"; "csrrsi"; "csrrci"]
 let loadInstrs = strsToNameset ["lb"; "lbu"; "lh"; "lhu"; "lw"]
 let storeInstrs = strsToNameset ["sb"; "sh"; "sw"]
 let branchInstrs = strsToNameset ["beq"; "bge"; "bgeu"; "blt"; "bltu"; "bne"]
@@ -209,14 +209,14 @@ let parseLa _ _ _ = raise (AsmParseFail "la is not currently supported")
 let parseLi env opc s =
   let _, r = opc in
   match get2Tokens s with
-  | Some (rd, (imm, immr), _) -> (match int_of_string_opt imm with
-    | None -> None
-    | Some k ->
-      let upper = k / 4096 in
-      let lower = k - 4096 * upper in
-      Some (MetaBlock (
-        if upper = 0 then [] else [finishedBlockOf (Instruction(UType {opc="lui", r; rd=nameToReg env rd; imm=string_of_int upper, immr}))]
-       @ (if lower = 0 then [] else [finishedBlockOf (Instruction(IArith {opc="addi", r; rd=nameToReg env rd; rs1 = Zero r; imm=string_of_int lower, immr}))]))))
+  | Some (rd, (imm, immr), _) -> (
+    let ks, _ = resolveNumericalImm env (imm, immr) in
+    let k = int_of_string ks in
+    let upper = k / 4096 in
+    let lower = k - 4096 * upper in
+    Some (MetaBlock (
+      if upper = 0 then [] else [finishedBlockOf (Instruction(UType {opc="lui", r; rd=nameToReg env rd; imm=string_of_int upper, immr}))]
+      @ (if lower = 0 then [] else [finishedBlockOf (Instruction(IArith {opc="addi", r; rd=nameToReg env rd; rs1 = Zero r; imm=string_of_int lower, immr}))]))))
   | None -> None
 let parseMv env opc s =
   let _, r = opc in
@@ -247,6 +247,20 @@ let parseRet _ opc _ =
   let _, r = opc in Some(Instruction(Jalr({
     opc="jalr", r; rd=Zero r; rs1=Ra r; imm="0", r
   })))
+let parseCsrw env opc s =
+  let _, r = opc in
+  match get2Tokens s with
+  | None -> None
+  | Some (csr, source, _) -> Some(Instruction(IArith({
+    opc="csrrw", r; rd=Zero r; rs1=nameToReg env source; imm=resolveNumericalImm env csr
+  })))
+let parseRdcycle env opc s =
+  let _, r = opc in
+  match parseToken s with
+  | None -> None
+  | Some (rd, _, r') -> Some(Instruction(IArith({
+    opc="csrrs", r'; rd=nameToReg env (rd, r'); rs1=Zero r; imm="0xb00", r
+  })))
 let tryParse env str =
   let s = CharStream.fromString origin str in
   match parseToken s with
@@ -270,6 +284,8 @@ let tryParse env str =
       else if opcode = "nop" then parseNop
       else if opcode = "not" then parseNot
       else if opcode = "ret" then parseRet
+      else if opcode = "csrw" then parseCsrw
+      else if opcode = "rdcycle" then parseRdcycle
       else if String.ends_with ~suffix:":" opcode
         then fun _ _ _ -> Some (Instruction(Label (
           String.sub opcode 0 (String.length opcode - 1))))

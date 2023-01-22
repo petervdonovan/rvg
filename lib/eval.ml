@@ -237,6 +237,9 @@ let%expect_test _ = printReducedAst testStd {|
     nop
     not t0 t1
     ret
+    csrw 0x51e s6
+    csrrw t0 sp 0x51e
+    rdcycle s0
   }
 |};
   [%expect {|
@@ -248,4 +251,7 @@ let%expect_test _ = printReducedAst testStd {|
     RType(sub, temp-t0, temp-t1, Zero)
     IArith(addi, Zero, Zero, 0)
     IArith(xori, temp-t0, temp-t1, -1)
-    Jalr(jalr, Zero, Ra, 0))) |}]
+    Jalr(jalr, Zero, Ra, 0)
+    IArith(csrrw, Zero, save-s6, 0x51e)
+    IArith(csrrw, temp-t0, Sp, 0x51e)
+    IArith(csrrs, save-s0, Zero, 0xb00))) |}]
