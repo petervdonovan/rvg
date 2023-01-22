@@ -9,15 +9,17 @@ let evalFile env f =
     in close_in ic; result)
   with e ->
     close_in_noerr ic;
-    (match e with
-    | Rvg.Ast.ParseFail (s, (p: Rvg.CharStream.position)) -> print_endline (
-      "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s)
-    | _ -> ());
     raise e
 
 let () =
-  ignore(
+  try ignore(
     Array.fold_left
     (fun env f -> if String.ends_with ~suffix:".rvg" f then evalFile env f else env)
     Rvg.Eval.Environment.empty
     (Array.sub Sys.argv 1 (Array.length Sys.argv - 1)))
+  with e ->
+    (match e with
+    | Rvg.Ast.ParseFail (s, (p: Rvg.CharStream.position)) -> print_endline (
+      "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s)
+    | Rvg.Std.AssertionFail s -> print_endline s
+    | _ -> raise e)

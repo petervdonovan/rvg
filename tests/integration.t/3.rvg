@@ -1,0 +1,4 @@
+[stdlib [mu []
+[def (a [lam! {1}]) [lam [(b)] b]]
+[def (c [lam! {2}]) [lam [(b)] b]]
+]]

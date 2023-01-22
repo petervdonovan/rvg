@@ -9,3 +9,6 @@
   $ dune exec -- ../../bin/main.exe stdlib.rvg 2.rvg
   a ok
   b ok
+  $ dune exec -- ../../bin/main.exe stdlib.rvg 3.rvg
+  Expected lam of width 2: line 11, col 20 to line 11, col 50
+  Assertion failed: line 2, col 20 to line 2, col 30

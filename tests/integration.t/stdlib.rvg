@@ -1,6 +1,14 @@
 [lam [(program)]
 
+[def (id) [lam [(x)] x]]
+
 [def (if) [lam [(condition) (then) (else)] [
   [condition then else]]]]
+
+[def (lam!) [lam [(k)] [lam [(l)]
+  [if
+    [[islam k] l]
+    [lam [] l]
+    [lam [] [fail l {Expected lam of width [id k]}]]]]]]
 
 [program]]
