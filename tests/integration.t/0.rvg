@@ -1,4 +1,4 @@
-[print [
+[[print [
   [lam [(e) (x)] {
     [e x]
     add a0 a1 a2
@@ -7,4 +7,4 @@
   [lam [(x)] x]
   {
     add t0 t1 t2
-  }]]
+  }]]]

@@ -35,18 +35,23 @@ let falseLambda = Ast.Lam {
   params=[]; lbody=[]; env=E.empty;
   f=fun args _ _ _ _ _ -> assertExactlyNArgs 2 args; List.nth args 1
 }
-
-let print args _ _ _ _ _ = (
+let emptyLam closure f = Ast.Lam {params=[]; lbody=[]; env=closure; f}
+let print args _ _ closure _ _ = (
   assertExactlyNArgs 1 args;
   let arg = List.hd args in
+  emptyLam closure (fun _ _ _ _ _ _ ->
   (match arg with
   | Ast.ParsedAsm pasm, _ -> if Array.get Sys.argv 1 <> "tokens" then Assembly.print pasm; arg
-  | _ -> raise (IllegalArgument ("Expected ParsedAsm, but got " ^ Ast.exprToString arg)))
+  | _ -> raise (IllegalArgument ("Expected ParsedAsm, but got " ^ Ast.exprToString arg)))),
+  snd arg
 )
-let fail args _ _ _ _ _ = (
+let fail args _ _ closure _ _ = (
   assertAtLeastNArgs 1 args;
-  args |> List.tl |> List.iter errorReportingPrintExpr);
-  raise (AssertionFail ("Assertion failed: " ^ (Ast.locationToString (List.hd args))))
+  emptyLam closure (fun _ _ _ _ _ _  ->
+  args |> List.tl |> List.iter errorReportingPrintExpr;
+  raise (AssertionFail ("Assertion failed: " ^ (Ast.locationToString (List.hd args))))),
+  args |> List.hd |> snd
+)
 let acceptFragment description args =
   assertExactlyNArgs 1 args;
   let attr = List.hd args in
@@ -54,7 +59,6 @@ let acceptFragment description args =
   | Ast.ParsedAsm Assembly.Fragment s, meta ->
     s, meta
   | _ -> raise (AssertionFail (description ^ " is not a fragment" ^ (Ast.locationToString attr)))
-let emptyLam closure f = Ast.Lam {params=[]; lbody=[]; env=closure; f}
 let addattr args _ _ closure _ _ = (
   let s, meta = acceptFragment "Attribute" args in
   emptyLam closure (fun args _ _ _ _ _ ->
@@ -135,7 +139,7 @@ let%expect_test _ = (try
 let%expect_test _ = (try
   Eval.printReducedAst std {|
   [[
-    [lam [(true) (false)] false]
+    [lam [(true) (false)] [false]]
     [lam [] {help}]
     [lam [] [fail {help}]]]]
   |} with

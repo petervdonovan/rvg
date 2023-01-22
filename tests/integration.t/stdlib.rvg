@@ -9,6 +9,6 @@
   [if
     [[islam k] l]
     [lam [] l]
-    [lam [] [fail l {Expected lam of width [id k]}]]]]]]
+    [fail l {Expected lam of width [id k]}]]]]]
 
 [program]]
