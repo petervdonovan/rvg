@@ -16,15 +16,16 @@ let metaEmpty = {
     endExclusive = {zeroBasedLine = 0; zeroBasedCol = 0};
   }
 }
-type expr =
-  | Name of (string * metadata)
-  | Var of (var * metadata)
-  | Asm of (string * metadata)
-  | ParsedAsm of (Assembly.t * metadata)
-  | Template of (template * metadata)
-  | Lam of (lam * metadata)
-  | LamApplication of (lam_application * metadata)
-  | Def of (define * metadata)
+type expr_content =
+  | Name of string
+  | Var of var
+  | Asm of string
+  | ParsedAsm of Assembly.t
+  | Template of template
+  | Lam of lam
+  | LamApplication of lam_application
+  | Def of define
+and expr = expr_content * metadata
 and template = expr list
 and var = {
   name: string;
@@ -53,38 +54,28 @@ and lam_function = (expr list (*args*)
   -> expr)
 
 let rec exprToString (e: expr): string = match e with
-  | Name (s, _) -> "Name(" ^ s ^ ")"
-  | Var ({ name; checks }, _) -> funNotation "Var" (["name=" ^ name] @ (checks |> List.map fst |> List.map exprToString))
-  | Asm (s, _) -> "Asm(" ^ s ^ ")"
-  | ParsedAsm (asm, _) ->
+  | Name s, _ -> "Name(" ^ s ^ ")"
+  | Var{ name; checks }, _ -> funNotation "Var" (["name=" ^ name] @ (checks |> List.map fst |> List.map exprToString))
+  | Asm s, _ -> "Asm(" ^ s ^ ")"
+  | ParsedAsm asm, _ ->
       funNotation "ParsedAsm" [Assembly.asmToString asm]
-  | Template (exprs, _) -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
-  | Lam (la, _) -> lamMuToString la
-  | LamApplication ({ lam; args }, _) -> "LamApplication(lam=" ^
+  | Template exprs, _ -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
+  | Lam la, _ -> lamMuToString la
+  | LamApplication { lam; args }, _ -> "LamApplication(lam=" ^
     exprToString lam ^ ", args=("
     ^ String.concat ", " (List.map exprToString args)
     ^ "))"
-  | Def ({dname; dvalue}, _) -> funNotation "Def" [exprToString (Var dname); sequenceToString dvalue]
+  | Def {dname; dvalue}, _ -> funNotation "Def" [exprToString (Var (fst dname), snd dname); sequenceToString dvalue]
 and sequenceToString seq = seq |> List.map exprToString |> String.concat "; "
 and lamMuToString la =
   let { params; lbody; _ } = la in
   ("Lam(params=[" ^
     List.fold_left (^) "" (List.map exprToString (
-      List.map (fun v -> Var (v, metaEmpty)) (List.map fst params)
+      List.map (fun v -> Var v, metaEmpty) (List.map fst params)
     )) ^ "], lbody="
     ^ (sequenceToString lbody)
     ^ ")")
-let metadata e =
-  match e with
-  | Name (_, metadata) -> metadata
-  | Var (_, metadata) -> metadata
-  | Asm (_, metadata) -> metadata
-  | ParsedAsm (_, metadata) -> metadata
-  | Template (_, metadata) -> metadata
-  | Lam (_, metadata) -> metadata
-  | LamApplication (_, metadata) -> metadata
-  | Def (_, metadata) -> metadata
-let locationToString e = CharStream.rangeToString (metadata e).r
+let locationToString e = CharStream.rangeToString (snd e).r
 
 let rec parseTopLevel std s =
   let token = CharStream.parseToken s in (
@@ -107,7 +98,7 @@ and parseLam std isMu startPos stream =
         let p, _, (s': CharStream.t) = parseVarList std p [] s in
           let lbody, s'' = parseExprs std [] s' in
           let meta = metaInitial {startInclusive=startPos; endExclusive=s'.current} in
-          Lam ({ params = p; lbody; env = Environment.empty; f = if isMu then Environment.find "mu" std else Environment.find "lam" std }, meta), s''
+          (Lam { params = p; lbody; env = Environment.empty; f = if isMu then Environment.find "mu" std else Environment.find "lam" std }, meta), s''
       | _ -> raise (ParseFail ("expected '['", (stream: CharStream.t).current))
 and parseDef std startInclusive stream =
   let char = CharStream.consumeWhitespace stream in
@@ -115,7 +106,7 @@ and parseDef std startInclusive stream =
   | Some ('(', s, p) ->
     let dname, s' = parseVar std p s in
     let dvalue, (s'': CharStream.t) = parseExprs std [] s' in
-    Def ({dname; dvalue}, metaInitial {startInclusive; endExclusive = s''.current}), s''
+    (Def {dname; dvalue}, metaInitial {startInclusive; endExclusive = s''.current}), s''
   | Some (bad, _, _) -> raise (ParseFail ("Expected '(', not " ^ (String.make 1 bad), (stream: CharStream.t).current))
   | None -> raise (ParseFail ("Expected Var, not end-of-file", (stream: CharStream.t).current))
 and parseVar std startInclusive stream =
@@ -129,7 +120,7 @@ and parseVar std startInclusive stream =
     | None -> raise (ParseFail ("Expected name, not end-of-file", (stream: CharStream.t).current))
 and parseTemplateRec std stream = let asm, meta, s = parseAsm stream in
   if asm <> "" then let rest, s' = parseTemplateRec std s in
-    List.cons (Asm (asm, meta)) rest, s'
+    List.cons (Asm asm, meta) rest, s'
   else match CharStream.parseToken s with
   | Some ("}", s', _) -> [], s'
   | Some ("[", s', _) -> let e, s'' = parseList std s'.current s' in
@@ -149,8 +140,8 @@ and parseAsm stream =
 and parseExpr std t s (r: CharStream.range) =
   if t = "[" then parseList std r.startInclusive s
   else if t = "{" then let (template, r', s) = parseTemplate std r.startInclusive s in
-  Template (template, metaInitial r'), s
-  else Name (t, metaInitial r), s
+  (Template template, metaInitial r'), s
+  else (Name t, metaInitial r), s
 and parseExprs std acc stream =
   match CharStream.parseToken stream with
   | Some ("]", s, _) -> acc, s
@@ -172,11 +163,11 @@ and parseLamApplication std token stream =
     then (parseList std r.startInclusive stream)
     else if Environment.mem t std then
       (CharStream.announceToken "function" "defaultLibrary" r;
-      Lam ({params=[]; lbody=[]; env=Environment.empty; f=Environment.find t std}, meta), stream)
-    else Name (t, meta), stream)
+      (Lam {params=[]; lbody=[]; env=Environment.empty; f=Environment.find t std}, meta), stream)
+    else (Name t, meta), stream)
   in
     let args, (s'': CharStream.t) = parseArgs std s' [] in
-    LamApplication (
+    (LamApplication
       { lam = lam; args = List.rev args },
       metaInitial {startInclusive = r.startInclusive; endExclusive = s''.current}
     ), s''
@@ -188,8 +179,8 @@ and parseArgs std stream accumulator =
   | Some (t, s, r) ->
     let nextExpr, s' =
       if t = "[" then parseList std r.startInclusive s
-      else if t = "{" then let tem, r, ss' = parseTemplate std r.startInclusive s in Template (tem, metaInitial r), ss'
-      else Name (t, metaInitial r), s
+      else if t = "{" then let tem, r, ss' = parseTemplate std r.startInclusive s in (Template tem, metaInitial r), ss'
+      else (Name t, metaInitial r), s
     in parseArgs std s' (nextExpr :: accumulator)
   | None -> raise (ParseFail ("Expected arg or ']', not end-of-file", (stream: CharStream.t).current))
 and parseVarList std startInclusive accumulator stream =
@@ -203,12 +194,13 @@ and parseVarList std startInclusive accumulator stream =
 let thisIsUnevaluatedOrNotAssembly description e =
   raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly"))
 let rec exprToParsedAsm env e =
-  match e with
+  let content, meta = e in
+  match content with
   | Name _ -> thisIsUnevaluatedOrNotAssembly "unbound name" e
   | Var _ -> thisIsUnevaluatedOrNotAssembly "variable declaration" e
-  | Asm (s, meta) -> Assembly.parse Assembly.empty env s, meta
-  | ParsedAsm (a, meta) -> a, meta
-  | Template (tem, meta) -> (tem
+  | Asm s -> Assembly.parse Assembly.empty env s, meta
+  | ParsedAsm a -> a, meta
+  | Template tem -> (tem
     |> List.map (exprToParsedAsm env)
     |> List.map fst
     |> List.rev (* FIXME: Performance issue? *)
@@ -224,8 +216,8 @@ let handleParseFail runnable = try runnable () with e -> match e with
   | _ -> raise e
 let parseFile std ic = parseTopLevel std (CharStream.inputChannelToSeq ic)
 let testStd = Environment.empty
-  |> Environment.add "lam" (fun _ _ _ _ _ _ -> Template ([], metaEmpty))
-  |> Environment.add "mu" (fun _ _ _ _ _ _ -> Template ([], metaEmpty))
+  |> Environment.add "lam" (fun _ _ _ _ _ _ -> Template [], metaEmpty)
+  |> Environment.add "mu" (fun _ _ _ _ _ _ -> Template [], metaEmpty)
 let getAst testStd text = text |> (CharStream.fromString CharStream.origin) |> parseTopLevel testStd
 let printAst text: unit =
   text |> getAst testStd |> exprToString |> print_endline

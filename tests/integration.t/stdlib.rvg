@@ -1,0 +1,6 @@
+[lam [(program)]
+
+[def (if) [lam [(condition) (then) (else)] [
+  [condition then else]]]]
+
+[program]]
