@@ -1,0 +1,10 @@
+[stdlib [mu [] [ctrl [mu []
+[def (acc) {a0}]
+[[print {
+    li acc 0
+    [[cycles! [* {10} {5}]]
+    [for_startup+iterations*<body+4>-2 {t0} {t1} {0} {10} {1} {
+        add acc acc t0
+    }]]
+}]]
+]]]]

@@ -217,8 +217,8 @@ let parseLi env opc s =
     let upper = k / 4096 in
     let lower = k - 4096 * upper in
     Some (MetaBlock (
-      if upper = 0 then [] else [finishedBlockOf (Instruction(UType {opc="lui", r; rd=nameToReg env rd; imm=string_of_int upper, immr}))]
-      @ (if lower = 0 then [] else [finishedBlockOf (Instruction(IArith {opc="addi", r; rd=nameToReg env rd; rs1 = Zero r; imm=string_of_int lower, immr}))]))))
+      (if upper = 0 then [] else [finishedBlockOf (Instruction(UType {opc="lui", r; rd=nameToReg env rd; imm=string_of_int upper, immr}))])
+      @ (if lower = 0 && upper <> 0 then [] else [finishedBlockOf (Instruction(IArith {opc="addi", r; rd=nameToReg env rd; rs1 = Zero r; imm=string_of_int lower, immr}))]))))
   | None -> None
 let parseMv env opc s =
   let _, r = opc in

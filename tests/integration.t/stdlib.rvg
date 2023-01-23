@@ -31,6 +31,8 @@
 [def (pair [lam! {2}]) [lam [(a) (b)]
   [lam [(get bool!)]
     [get a b]]]]
-[def (cycles!) [lam [(k num!)] [lam [(b block!)] [[=! k] [cycles? b]]]]]
-
+[def (cycles!) [lam [(k num!)] [lam [(b block!)] [[=! k] [cycles? b]] b]]]
+[def (println) [lam [(s)] [lam [] [[print s]] [[print {
+}]]]]]
+[def (/*) [lam [(x)] {}]]
 [program]]

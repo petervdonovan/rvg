@@ -15,7 +15,7 @@
     DONE:
   }]
   [[unsafe_assert_exact_cycles {3}] assembly]]]
-[def (for_iterations*<body+4>-2) [lam [(counter reg!) (clobber reg!) (start num!) (stop num!) (step num!) (body block!)]
+[def (for_startup+iterations*<body+4>-2) [lam [(counter reg!) (clobber reg!) (start num!) (stop num!) (step num!) (body block!)]
   [def (stopreg) clobber]
   [def (startup) {
     li counter start
@@ -23,16 +23,17 @@
   }]
   [def (num-iterations) [/ [- stop start] step]]
   [def (addition-and-branching-cycles) {4}]
-  [def (assembly [unsafe_assert_exact_cycles [-
-      [*
-        num-iterations
-        [+ cycles-body addition-and-branching-cycles]]
-      {2}]]
-    ) {
+  [def (total-cycles num!) [+ [cycles? startup] [-
+    [* num-iterations
+      [+ [cycles? body] addition-and-branching-cycles]]
+    {2}]]]
+  [def (assembly [unsafe_assert_exact_cycles total-cycles]) {
+    [id startup]
     LOOP:
     [id body]
     addi counter counter step
     blt counter stopreg LOOP
   }]
+  assembly
   ]]
 [program]]

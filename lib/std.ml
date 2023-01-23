@@ -184,14 +184,14 @@ let plus = binaryMathOp (+)
 let minus = binaryMathOp (-)
 let times = binaryMathOp ( * )
 let dividedBy = binaryMathOp (/)
-let assertEqual args _ _ closure _ _ r =
+let assertNumericalComparisonResult comparator args _ _ closure _ _ r =
   assertExactlyNArgs 1 args;
   let arg0, _ = args |> List.hd |> getNumericalArg in
   emptyLam closure (fun args _ _ _ _ _ _ ->
     assertExactlyNArgs 1 args;
     let arg1expr = List.hd args in
     let arg1, r1 = arg1expr |> getNumericalArg in
-    (if arg0 = arg1 then arg1expr else raise (AssertionFail ("Expected " ^ (string_of_int arg0) ^ " but got " ^ (string_of_int arg1) ^ ": " ^ Ast.locationToString (arg1, r1))))
+    (if comparator arg0 arg1 then arg1expr else raise (AssertionFail ("Expected " ^ (string_of_int arg0) ^ " but got " ^ (string_of_int arg1) ^ ": " ^ Ast.locationToString (arg1, r1))))
   ), Ast.metaInitial r
 let std: Ast.lam_function E.t = E.empty
   |> E.add "lam" Eval.lam
@@ -212,7 +212,8 @@ let std: Ast.lam_function E.t = E.empty
   |> E.add "*" times
   |> E.add "-" minus
   |> E.add "/" dividedBy
-  |> E.add "=!" assertEqual
+  |> E.add "=!" (assertNumericalComparisonResult (=))
+  |> E.add "<!" (assertNumericalComparisonResult (<))
 
 let%expect_test _ = (try
   Eval.printReducedAst std {|
@@ -244,4 +245,4 @@ let%expect_test _ = (try Eval.printReducedAst std {|
       }]
   |} with
     | AssertionFail s -> print_string s);
-  [%expect{| Expected assembly taking 4 cycles but got assembly taking 3 cycles. |}]
+  [%expect{| ParsedAsm(Fragment(3)) |}]
