@@ -175,6 +175,15 @@ let unsafeAssertKCycles args _ _ _ currentEnv _ _ =
   let asmexpr = args |> List.tl |> List.hd in
   let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) asmexpr in
     Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')), metadata
+let binaryMathOp op args _ _ _ _ _ r =
+  assertExactlyNArgs 2 args;
+  let arg0, _ = args |> List.hd |> getNumericalArg in
+  let arg1, _ = List.nth args 1 |> getNumericalArg in
+  Ast.ParsedAsm (Assembly.Fragment (string_of_int (op arg0 arg1))), Ast.metaInitial r
+let plus = binaryMathOp (+)
+let minus = binaryMathOp (-)
+let times = binaryMathOp ( * )
+let dividedBy = binaryMathOp (/)
 let std: Ast.lam_function E.t = E.empty
   |> E.add "lam" Eval.lam
   |> E.add "mu" Eval.mu
@@ -190,6 +199,10 @@ let std: Ast.lam_function E.t = E.empty
   |> E.add "frag?" isFragment
   |> E.add "block?" isFinishedBlock
   |> E.add "reg?" isReg
+  |> E.add "+" plus
+  |> E.add "*" times
+  |> E.add "-" minus
+  |> E.add "/" dividedBy
 
 let%expect_test _ = (try
   Eval.printReducedAst std {|

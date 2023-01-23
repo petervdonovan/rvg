@@ -42,3 +42,5 @@
       add t0, t0, t1
       addi t0, t0 67
   Expected assembly taking 3 cycles but got assembly taking 4 cycles.
+  $ dune exec -- ../../bin/main.exe 9.rvg
+  15
