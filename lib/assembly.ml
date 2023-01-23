@@ -343,8 +343,8 @@ let prependBlock env acc prependable =
    they must have sticky ends; else they are finished *)
 let rec promoteOrDemote env b =
     if List.length b.middle = 0 then Fragment b.top
-    else if b.top = ""
-      then if b.bottom = ""
+    else if String.trim b.top = ""
+      then if String.trim b.bottom = ""
         then FinishedBlock (MetaBlock b.middle |> finishedBlockOf)
       else match tryParse env b.bottom with
       | Some inst -> promoteOrDemote env

@@ -94,12 +94,12 @@ let%expect_test _ =
   jalr zero t4 END2
   |};
   [%expect{|
-    Block(, MetaBlock(RType(add, temp-t0, temp-t1, temp-t2)
+    MetaBlock(RType(add, temp-t0, temp-t1, temp-t2)
     IArith(addi, temp-a0, temp-a1, 0x66)
     Load(lbu, save-s4, temp-t6, 12)
     Branch(beq, temp-a5, temp-t3, END)
     Jal(jal, Ra, END3)
-    Jalr(jalr, Zero, temp-t4, END2)),   ) |}]
+    Jalr(jalr, Zero, temp-t4, END2)) |}]
 
 let printReducedAst std text =
   text |> Ast.getAst std |> evalExpr Environment.empty |> fst |> Ast.exprToString
@@ -141,7 +141,7 @@ let%expect_test _ = printReducedAst testStd {|
       addi t0 t1 x
     }] { 12 }]
   |};
-  [%expect {| ParsedAsm(MetaBlock(IArith(addi, temp-t0, temp-t1,  12 ))) |}]
+  [%expect {| ParsedAsm(MetaBlock(MetaBlock(IArith(addi, temp-t0, temp-t1,  12 )))) |}]
 
 let%expect_test _ = printReducedAst testStd {|
   [[lam [(x)] {
@@ -152,9 +152,8 @@ let%expect_test _ = printReducedAst testStd {|
   }] { 12 }]
   |};
   [%expect {|
-    ParsedAsm(Block(
-        , MetaBlock(MetaBlock(IArith(addi, Zero, Zero,  12 ))
-    IArith(slli, temp-t1, temp-t2,  12 )), )) |}]
+    ParsedAsm(MetaBlock(MetaBlock(MetaBlock(IArith(addi, Zero, Zero,  12 )))
+    MetaBlock(IArith(slli, temp-t1, temp-t2,  12 )))) |}]
 
 let%expect_test _ = printReducedAst testStd {|
     [[lam [(x)]
@@ -203,8 +202,8 @@ let%expect_test _ = printReducedAst testStd {|
   }
   |};
   [%expect{|
-    ParsedAsm(MetaBlock(Label(START:)
-    Jal(jal, Ra, START))) |}]
+    ParsedAsm(MetaBlock(MetaBlock(Label(START:)
+    Jal(jal, Ra, START)))) |}]
 
 let%expect_test _ = printEndingAsm {|
   {
@@ -244,7 +243,7 @@ let%expect_test _ = printReducedAst testStd {|
   }
 |};
   [%expect {|
-    ParsedAsm(MetaBlock(UType(lui, temp-t1, 0x40000)
+    ParsedAsm(MetaBlock(MetaBlock(UType(lui, temp-t1, 0x40000)
     UType(auipc, temp-a0, 0x12345)
     MetaBlock(UType(lui, temp-t1, 524288)
     IArith(addi, temp-t1, Zero, 1))
@@ -255,4 +254,4 @@ let%expect_test _ = printReducedAst testStd {|
     Jalr(jalr, Zero, Ra, 0)
     IArith(csrrw, Zero, save-s6, 0x51e)
     IArith(csrrw, temp-t0, Sp, 0x51e)
-    IArith(csrrs, save-s0, Zero, 0xb00))) |}]
+    IArith(csrrs, save-s0, Zero, 0xb00)))) |}]

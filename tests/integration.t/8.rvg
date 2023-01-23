@@ -1,0 +1,15 @@
+[stdlib [mu []
+[def (+=) [lam [(k num!)] [lam [(r reg!)] {
+    addi r r k
+}]]]
+[def (testblock) {
+    [[+= {4}] {t0}]
+    add t0 t0 t1
+    [[+= {67}] {t0}]
+}]
+[[print testblock]]
+{testblock takes 3 cycles to execute, so "exact_cycles 4 testblock" would fail}
+[def (testblock') [unsafe_assert_exact_cycles {4} testblock]]
+[exact_cycles {4} testblock']
+[exact_cycles {3} testblock']
+]]

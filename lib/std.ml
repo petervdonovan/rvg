@@ -147,29 +147,41 @@ let rec getCycles (f: Assembly.finished_block) = match f.totalCycles with
       (fun a b -> match a, b with | Some k, Some n -> Some (k + n) | _ -> None)
       (Some 0)
       (List.map getCycles mb))
-let exactCycles args _ _ _ _ _ _ =
+let getFinishedBlock env asmexpr =
+  let failure = (IllegalArgument ("Expected argument of type FinishedBlock but got " ^ (Ast.exprToString asmexpr))) in
+  match asmexpr with
+  | Ast.ParsedAsm pasm, metadata -> (match pasm with
+    | Assembly.FinishedBlock asmtem' -> asmtem', metadata
+    | Assembly.Block b -> (print_endline "hello";match Assembly.promoteOrDemote env b with
+      | Assembly.FinishedBlock asmtem' -> asmtem', metadata
+      | _ -> raise failure)
+    | _ -> raise failure)
+  | _ -> raise failure
+let exactCycles args _ _ _ currentEnv _ _ =
   assertExactlyNArgs 2 args;
-  let kexpr = List.hd args in
+  let k, _ = args |> List.hd |> getNumericalArg in
   let asmexpr = args |> List.tl |> List.hd in
-  match kexpr, asmexpr with
-  | (Ast.ParsedAsm (Assembly.Fragment ktem'), _),
-    (Ast.ParsedAsm (Assembly.FinishedBlock asmtem'), metadata) -> (
-    let k = int_of_string ktem' in
+  let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) asmexpr in
     match getCycles asmtem' with
     | Some k' -> if k <> k'
       then raise (AssertionFail ("Expected assembly taking " ^ (string_of_int k) ^ " cycles but got assembly taking " ^ (string_of_int k') ^ " cycles."))
       else Ast.ParsedAsm (
         Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')),
         metadata
-    | None -> raise (AssertionFail "Failed to determine exact number of cycles"))
-  | _ -> raise (IllegalArgument ("Expected two arguments of type Fragment and FinishedBlock respectively, but got " ^ (Ast.exprToString kexpr) ^ " and " ^ (Ast.exprToString asmexpr)))
-
+    | None -> raise (AssertionFail "Failed to determine exact number of cycles")
+let unsafeAssertKCycles args _ _ _ currentEnv _ _ =
+  assertExactlyNArgs 2 args;
+  let k, _ = args |> List.hd |> getNumericalArg in
+  let asmexpr = args |> List.tl |> List.hd in
+  let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) asmexpr in
+    Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')), metadata
 let std: Ast.lam_function E.t = E.empty
   |> E.add "lam" Eval.lam
   |> E.add "mu" Eval.mu
   |> E.add "print" print
   |> E.add "fail" fail
   |> E.add "exact_cycles" exactCycles
+  |> E.add "unsafe_assert_exact_cycles" unsafeAssertKCycles
   |> E.add "addattr" addattr
   |> E.add "hasattr" hasattr
   |> E.add "lam?" isLam

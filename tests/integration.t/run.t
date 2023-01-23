@@ -37,3 +37,8 @@
   ok alphabet
   ok var-deref0
   ok var-deref1
+  $ dune exec -- ../../bin/main.exe stdlib.rvg 8.rvg
+      addi t0, t0 4
+      add t0, t0, t1
+      addi t0, t0 67
+  Expected assembly taking 3 cycles but got assembly taking 4 cycles.
