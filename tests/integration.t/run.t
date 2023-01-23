@@ -23,3 +23,17 @@
   curried successfully
   first thing to print
   second thing to print
+  $ dune exec -- ../../bin/main.exe stdlib.rvg 6.rvg
+  pass
+  7
+  Expected a number: line 21, col 18 to line 21, col 45
+  Assertion failed: line 6, col 3 to line 6, col 17
+  $ dune exec -- ../../bin/main.exe stdlib.rvg 7.rvg
+  ok 23
+  ok nop
+  ok addi
+  ok nasty
+  ok t0
+  ok alphabet
+  ok var-deref0
+  ok var-deref1

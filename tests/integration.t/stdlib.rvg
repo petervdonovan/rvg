@@ -16,5 +16,13 @@
     [lam [(arg0) (arg1)]
       {This is very bad! we can only forward a fixed number of args (in this case, 2), so this library function isn't fully general.}
       [result_check [l arg0 arg1]]]]]]
+[def (assertify) [lam [(? [lam! {1}]) (description)] [lam [(checkee)]
+  [if [? checkee]
+    [lam [] checkee]
+    [fail checkee {Expected [id description]}]]]]]
+[def (num!) [assertify [lam [(x)] [num? x]] {a number}]]
+[def (frag!) [assertify [lam [(x)] [frag? x]] {a fragment}]]
+[def (block!) [assertify [lam [(x)] [block? x]] {an assembly block}]]
+[def (reg!) [assertify [lam [(x)] [reg? x]] {a register}]]
 
 [program]]

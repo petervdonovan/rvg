@@ -1,0 +1,19 @@
+[stdlib [mu []
+[if [frag? {23}] [print {ok 23
+}] [print {failed}]]
+[if [frag? {nop}] [print {failed}] [print {ok nop
+}]]
+[if [block? {addi zero zero 1}] [print {ok addi
+}] [print {failed}]]
+[if [block? {nasty}] [print {failed}] [print {ok nasty
+}]]
+[if [reg? {t0}] [print {ok t0
+}] [print {failed}]]
+[if [reg? {alphabet}] [print {failed}] [print {ok alphabet
+}]]
+[def (my-fancy-register-name) {zero}]
+[if [reg? my-fancy-register-name] [print {ok var-deref0
+}] [print {failed}]]
+[if [reg? {my-fancy-register-name}] [print {ok var-deref1
+}] [print {failed}]]
+]]

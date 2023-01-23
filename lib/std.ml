@@ -112,6 +112,31 @@ let lamOf paramChecks _ _ closure _ _ _ = (
     | _ -> raise (AssertionFail ("Expected lam " ^ Ast.locationToString checkee))
   ), Ast.metaEmpty
 )
+let isX predicate args _ _ _ _ _ _  = (
+  assertExactlyNArgs 1 args;
+  let arg, meta' = List.hd args in
+  if predicate arg then trueLambda, meta' else falseLambda, meta'
+)
+let isNum = isX (fun arg -> match arg with
+  | Ast.ParsedAsm Assembly.Fragment s ->
+    (match int_of_string_opt s with
+    | Some _ -> true
+    | None -> false)
+  | _ -> false)
+let isFragment = isX (fun arg -> match arg with
+  | Ast.ParsedAsm Assembly.Fragment _ -> true
+  | _ -> false)
+let isFinishedBlock = isX (fun arg -> match arg with
+  | Ast.ParsedAsm Assembly.FinishedBlock _ -> true
+  | _ -> false)
+let isReg args _ _ _ currentEnv _ _  = (
+  assertExactlyNArgs 1 args;
+  let arg, meta' = List.hd args in
+  match arg with
+  | Ast.ParsedAsm Assembly.Fragment s ->
+    (try ignore(Assembly.nameToReg (Eval.expectAsm currentEnv) (s, meta'.r)); trueLambda, meta'
+    with _ -> falseLambda, meta')
+  | _ -> falseLambda, meta')
 let unsafeAssertKCyclesFb k (f: Assembly.finished_block): Assembly.finished_block = (
   {content=f.content; provides=f.provides; totalCycles = Some k; cyclesMod=f.cyclesMod})
 let rec getCycles (f: Assembly.finished_block) = match f.totalCycles with
@@ -149,6 +174,10 @@ let std: Ast.lam_function E.t = E.empty
   |> E.add "hasattr" hasattr
   |> E.add "lam?" isLam
   |> E.add "lamof" lamOf
+  |> E.add "num?" isNum
+  |> E.add "frag?" isFragment
+  |> E.add "block?" isFinishedBlock
+  |> E.add "reg?" isReg
 
 let%expect_test _ = (try
   Eval.printReducedAst std {|

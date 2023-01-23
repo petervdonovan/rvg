@@ -1,0 +1,8 @@
+[stdlib [mu []
+[if [num? {0x879}] [print {pass
+}] [print {fail}]]
+[def (a [lam! {1}]) [lam [(n num!)] [[print n]] [[print {
+}]]]]
+[a {7}]
+[a {Not a number}]
+]]
