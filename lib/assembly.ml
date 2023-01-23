@@ -28,7 +28,6 @@ type instruction =
   | UType of u_or_j_format
   | Label of string
 type fragment = string
-type label = string
 type nonce = string
 module Noncification = Map.Make(String)
 module CyclesModMap = Map.Make(Int)
@@ -128,6 +127,9 @@ let resolveNumericalImm env imm =
   match s |> int_of_string_opt with
   | Some _ -> imm
   | None -> env s "Numerical immediate"
+let resolveLabel env (label: string * range) =
+  let l, _ = label in
+  try env l "Label" with AsmParseFail _ -> label
 let asmParseFail formatDescription s =
   raise (AsmParseFail ("Instruction \"" ^ (charSeqToString s) ^ "\" does not follow the instruction syntax for " ^ formatDescription))
 let parseR env opc s =
@@ -159,22 +161,22 @@ let parseBranch env opc s =
   match get3Tokens s with
   | Some (rs1, rs2, label, _) -> Some (Instruction(Branch {
     opc = opc; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2;
-    imm = label
+    imm = resolveLabel env label
   }))
   | None -> None
 let parseJal env opc s =
   match get2Tokens s with
-  | Some (rd, label, _) -> Some (Instruction(Jal { opc = opc; rd = nameToReg env rd; imm = label }))
+  | Some (rd, label, _) -> Some (Instruction(Jal { opc = opc; rd = nameToReg env rd; imm = resolveLabel env label }))
   | None -> None
 let parseJalr env opc s =
   match get3Tokens s with
   | Some (rd, rs1, label, _) -> Some (Instruction(Jalr {
-    opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; imm = label
+    opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; imm = resolveLabel env label
   }))
   | None -> None
 let parseU env opc s =
   match get2Tokens s with
-  | Some (rd, label, _) -> Some (Instruction(UType { opc = opc; rd = nameToReg env rd; imm = label }))
+  | Some (rd, imm, _) -> Some (Instruction(UType { opc = opc; rd = nameToReg env rd; imm }))
   | None -> None
 let parseBxxz env opc s = (
   let opcs, r = opc in
@@ -183,16 +185,16 @@ let parseBxxz env opc s = (
       opc = if opcs = "beqz" then "beq", r else "bnez", r;
       rs1 = nameToReg env rs1;
       rs2=Zero r;
-      imm=label
+      imm=resolveLabel env label
     }))
   | None -> None)
-let parseJ _ opc s =
+let parseJ env opc s =
   let _, r = opc in
   match CharStream.parseToken s with
   | Some (label, _, r') -> Some (Instruction(Jal {
     opc = "jal", r;
     rd = Zero r;
-    imm = label, r'
+    imm = resolveLabel env (label, r')
   }))
   | None -> None
 let parseJr env opc s =
@@ -378,7 +380,7 @@ and printFinishedBlock hn fb =
   | Instruction i -> print_string (stringifyInstruction hn' i)
   | MetaBlock mb -> List.iter (printFinishedBlock hn') mb
 and stringifyInstruction hierarchicalNoncifications i =
-  let noncify label = label ^ "_" ^ Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications) in
+  let noncify label = try label ^ "_" ^ Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications) with Not_found -> print_endline ("Could not find label " ^ label ^ " in the current context, and so could not print the label with the correct nonce"); raise Not_found in
   let ($) s reg = s ^ (match reg with
     | TempReg (s, _) -> s
     | SaveReg (s, _) -> s

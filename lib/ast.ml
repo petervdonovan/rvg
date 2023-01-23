@@ -157,7 +157,7 @@ and parseChecksRec std acc s =
   | Some (t, s', r) -> let check, s'' = parseExpr std t s' r in
     let meta = metaInitial {startInclusive=r.startInclusive; endExclusive=s''.current} in
     parseChecksRec std (List.cons (check, meta) acc) s''
-  | None -> raise (ParseFail ("Expected expression of ), not end-of-file", (s: CharStream.t).current))
+  | None -> raise (ParseFail ("Expected expression or ), not end-of-file", (s: CharStream.t).current))
 and parseLamApplication std token stream =
   let t, r = token in
   let meta = metaInitial r in

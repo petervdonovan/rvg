@@ -1,0 +1,38 @@
+[mu [(program)]
+[def (condition!) [assertify [lam [(x)] [[hasattr {condition}] x]] {a condition}]]
+[def (<) [lam [(rs1 reg!) (rs2 reg!)]
+  [[addattr {condition}]
+    [lam [(label frag!)]
+      [pair {
+        blt rs1 rs2 label
+      } {
+        bgeu rs1 rs2 label
+      }]]]]]
+[def (branch3) [lam [(condition condition!) (instrs block!)]
+  [def (assembly) {
+    [id { [id [[condition {DONE}] false]] } ]
+    [id instrs]
+    DONE:
+  }]
+  [[unsafe_assert_exact_cycles {3}] assembly]]]
+[def (for_iterations*<body+4>-2) [lam [(counter reg!) (clobber reg!) (start num!) (stop num!) (step num!) (body block!)]
+  [def (stopreg) clobber]
+  [def (startup) {
+    li counter start
+    li stopreg stop
+  }]
+  [def (num-iterations) [/ [- stop start] step]]
+  [def (addition-and-branching-cycles) {4}]
+  [def (assembly [unsafe_assert_exact_cycles [-
+      [*
+        num-iterations
+        [+ cycles-body addition-and-branching-cycles]]
+      {2}]]
+    ) {
+    LOOP:
+    [id body]
+    addi counter counter step
+    blt counter stopreg LOOP
+  }]
+  ]]
+[program]]

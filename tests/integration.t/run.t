@@ -44,3 +44,4 @@
   Expected assembly taking 3 cycles but got assembly taking 4 cycles.
   $ dune exec -- ../../bin/main.exe 9.rvg
   15
+  $ dune exec --debug-backtraces -- ../../bin/main.exe stdlib.rvg ctrl.rvg 10.rvg

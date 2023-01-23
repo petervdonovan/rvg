@@ -25,4 +25,12 @@
 [def (block!) [assertify [lam [(x)] [block? x]] {an assembly block}]]
 [def (reg!) [assertify [lam [(x)] [reg? x]] {a register}]]
 
+[def (true  [addattr {bool}]) [lam [(a) (b)] a]]
+[def (false [addattr {bool}]) [lam [(a) (b)] b]]
+[def (bool!) [assertify [lam [(x)] [[hasattr {bool}] x]] {a boolean}]]
+[def (pair [lam! {2}]) [lam [(a) (b)]
+  [lam [(get bool!)]
+    [get a b]]]]
+[def (cycles!) [lam [(k num!)] [lam [(b block!)] [[=! k] [cycles? b]]]]]
+
 [program]]
