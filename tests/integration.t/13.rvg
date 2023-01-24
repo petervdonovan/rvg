@@ -1,0 +1,5 @@
+[
+  [applierify-varargs
+    [lam [(applier)]
+      [applier [lam [(x) (y) (z)] [[print x]] [[print y]] [[print z]]]]]]
+  {alphabet} { soup } {bishop}]

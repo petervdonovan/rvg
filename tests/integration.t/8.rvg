@@ -9,7 +9,7 @@
 }]
 [[print testblock]]
 {testblock takes 3 cycles to execute, so "exact_cycles 4 testblock" would fail}
-[def (testblock') [[unsafe_assert_exact_cycles {4}] testblock]]
+[def (testblock') [[unsafe-assert-exact-cycles {4}] testblock]]
 [[cycles! {4}] testblock']
 [[cycles! {3}] testblock']
 ]]

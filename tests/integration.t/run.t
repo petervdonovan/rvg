@@ -20,13 +20,11 @@
   Expected lam of 1 parameters: line 11, col 12 to line 11, col 47
   Assertion failed: line 6, col 3 to line 6, col 12
   $ dune exec -- ../../bin/main.exe stdlib.rvg 5.rvg
-  curried successfully
-  first thing to print
-  second thing to print
+  line 16, col 7 to line 16, col 19: Unbound name: result_check
   $ dune exec -- ../../bin/main.exe stdlib.rvg 6.rvg
   pass
   7
-  Expected a number: line 21, col 18 to line 21, col 45
+  Expected a number: line 20, col 18 to line 20, col 45
   Assertion failed: line 6, col 3 to line 6, col 12
   $ dune exec -- ../../bin/main.exe stdlib.rvg 7.rvg
   ok 23
@@ -66,3 +64,5 @@
       addi t0, t1, 12
       addi t0, t1, 12
       addi t0, t1, 12
+  $ dune exec -- ../../bin/main.exe 13.rvg
+  alphabet soup bishop

@@ -216,13 +216,26 @@ let foldRange args _ _ closure _ _ r =
             Ast.ParsedAsm (Assembly.Fragment (string_of_int x)), Ast.metaInitial r))
     )), Ast.metaInitial r
   )), Ast.metaInitial r
+let applierifyVarargs args _ _ closure _ _ r =
+  assertExactlyNArgs 1 args r;
+  let applyee = List.hd args in
+  emptyLam closure (fun varargs _ _ closure' currentEnv _ r' -> (
+    Eval.evalExpr currentEnv (Ast.LamApplication
+    {lam=applyee; args=[emptyLam closure' (fun args _ _ _ _ _ r'' -> (
+      assertExactlyNArgs 1 args r;
+      let nestedApplyee = List.hd args in
+      Eval.evalExpr currentEnv (
+        Ast.LamApplication {lam=nestedApplyee; args=varargs}, Ast.metaInitial r''
+      ) |> fst
+    )), Ast.metaInitial r']}, Ast.metaInitial r') |> fst)
+  ), Ast.metaInitial r
 let std: Ast.lam_function E.t = E.empty
   |> E.add "lam" Eval.lam
   |> E.add "mu" Eval.mu
   |> E.add "print" print
   |> E.add "fail" fail
   |> E.add "cycles?" exactCycles
-  |> E.add "unsafe_assert_exact_cycles" unsafeAssertKCycles
+  |> E.add "unsafe-assert-exact-cycles" unsafeAssertKCycles
   |> E.add "addattr" addattr
   |> E.add "hasattr" hasattr
   |> E.add "lam?" isLam
@@ -241,6 +254,7 @@ let std: Ast.lam_function E.t = E.empty
   |> E.add ">!" (assertNumericalComparisonResult (>) "greater than")
   |> E.add ">=!" (assertNumericalComparisonResult (>=) "greater than or equal to")
   |> E.add "fold_range" foldRange
+  |> E.add "applierify-varargs" applierifyVarargs
 
 let%expect_test _ = (try
   Eval.printReducedAst std {|
