@@ -16,11 +16,12 @@
   }]
   [[unsafe_assert_exact_cycles {3}] assembly]]]
 [def (unroll) [lam [(n num!) (body block!)]
-  [[[fold_range {1} {0} n] {}]
+  [[unsafe_assert_exact_cycles [* n [cycles? body]]]
+    [[[fold_range {1} {0} n] {}]
     [lam [(acc) (_)] {
       [id acc]
       [id body]
-    }]]]]
+    }]]]]]
 [def (for) [lam [
     (start reg!) (stop reg!)
     (step num! [>! {0}])
@@ -51,7 +52,7 @@
   {
     [id startup]
     [[unsafe_assert_exact_cycles
-      [[assembly,cycles false] num-iterations]]
+        [[assembly,cycles false] num-iterations]]
       [assembly,cycles true]]
   }]]
 [program]]
