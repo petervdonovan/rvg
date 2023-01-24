@@ -3,7 +3,7 @@
       add a0, a1, a2
       add t0, t1, t2
   $ dune exec -- ../../bin/main.exe 1-multiple-files/a.rvg 1-multiple-files/b.rvg
-      addi zero, zero 0
+      addi zero, zero, 0
   $ dune exec -- ../../bin/main.exe tokens 0.rvg
   {"kind": "function", "modifier": "defaultLibrary", "startInclusive": [0, 2], "endExclusive": [0, 7] }
   $ dune exec -- ../../bin/main.exe stdlib.rvg 2.rvg
@@ -38,24 +38,24 @@
   ok var-deref0
   ok var-deref1
   $ dune exec -- ../../bin/main.exe stdlib.rvg 8.rvg
-      addi t0, t0 4
+      addi t0, t0, 4
       add t0, t0, t1
-      addi t0, t0 67
+      addi t0, t0, 67
   Expected exactly 3 but got 4: line 4, col 17 to line 8, col 1
   $ dune exec -- ../../bin/main.exe 9.rvg
   15
   $ dune exec -- ../../bin/main.exe stdlib.rvg ctrl.rvg 10.rvg
-      bgeu zero, t0 DONE_tJ6slU7Skn
-      lw t1 0(t0)
+      bgeu zero, t0, DONE_tJ6slU7Skn
+      lw t1, 0(t0)
   DONE_tJ6slU7Skn:
   $ dune exec -- ../../bin/main.exe stdlib.rvg ctrl.rvg 11.rvg
-      addi a0, zero 0
-      addi t0, zero 0
-      addi t1, zero 10
+      addi a0, zero, 0
+      addi t0, zero, 0
+      addi t1, zero, 10
   LOOP_tJ6slU7Skn:
       add a0, a0, t0
-      addi t0, t0 1
-      blt t0, t1 LOOP_tJ6slU7Skn
+      addi t0, t0, 1
+      blt t0, t1, LOOP_tJ6slU7Skn
   $ dune exec -- ../../bin/main.exe ctrl.rvg stdlib.rvg ../../bin/main.exe 12.rvg
   3
   7
@@ -63,3 +63,7 @@
   15
   19
   55
+      addi t0, t1, 12
+      addi t0, t1, 12
+      addi t0, t1, 12
+  

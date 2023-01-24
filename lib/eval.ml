@@ -218,8 +218,8 @@ let%expect_test _ = printEndingAsm {|
   [%expect {|
     START_5TsUpEQjDf:
     START_Kd4gRhlUDG:
-        bne t0, t1 START_Kd4gRhlUDG
-        jal gp START_5TsUpEQjDf |}]
+        bne t0, t1, START_Kd4gRhlUDG
+        jal gp, START_5TsUpEQjDf |}]
 
 let%expect_test _ = printReducedAst testStd {|
   [[lam [(x [lam [(la)] [la]])] x]

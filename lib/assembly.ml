@@ -392,8 +392,8 @@ and stringifyInstruction hierarchicalNoncifications i =
   let ($$) s (reg: register) = (s ^ "(" $ reg) ^ ")" in
   let (<) opc t = "    " ^ (fst opc) ^ " " $ t in
   let ($) s reg = (s ^ ", ") $ reg in
-  let (=) s imm = s ^ " " ^ (fst imm) in
-  let (==) s imm = s ^ " " ^ (imm |> fst |> noncify) in
+  let (=) s imm = s ^ ", " ^ (fst imm) in
+  let (==) s imm = s ^ ", " ^ (imm |> fst |> noncify) in
   (match i with
   | RType { opc; rd; rs1; rs2 }   -> opc < rd $ rs1 $ rs2
   | IArith { opc; rd; rs1; imm }  -> opc < rd $ rs1 = imm
