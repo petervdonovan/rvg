@@ -41,7 +41,7 @@
       addi t0, t0 4
       add t0, t0, t1
       addi t0, t0 67
-  Expected 3 but got 4: line 4, col 17 to line 8, col 1
+  Expected exactly 3 but got 4: line 4, col 17 to line 8, col 1
   $ dune exec -- ../../bin/main.exe 9.rvg
   15
   $ dune exec --debug-backtraces -- ../../bin/main.exe stdlib.rvg ctrl.rvg 10.rvg

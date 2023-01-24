@@ -184,14 +184,14 @@ let plus = binaryMathOp (+)
 let minus = binaryMathOp (-)
 let times = binaryMathOp ( * )
 let dividedBy = binaryMathOp (/)
-let assertNumericalComparisonResult comparator args _ _ closure _ _ r =
+let assertNumericalComparisonResult comparator description args _ _ closure _ _ r =
   assertExactlyNArgs 1 args;
   let arg0, _ = args |> List.hd |> getNumericalArg in
   emptyLam closure (fun args _ _ _ _ _ _ ->
     assertExactlyNArgs 1 args;
     let arg1expr = List.hd args in
     let arg1, r1 = arg1expr |> getNumericalArg in
-    (if comparator arg0 arg1 then arg1expr else raise (AssertionFail ("Expected " ^ (string_of_int arg0) ^ " but got " ^ (string_of_int arg1) ^ ": " ^ Ast.locationToString (arg1, r1))))
+    (if comparator arg1 arg0 then arg1expr else raise (AssertionFail ("Expected " ^ description ^ " " ^ (string_of_int arg0) ^ " but got " ^ (string_of_int arg1) ^ ": " ^ Ast.locationToString (arg1, r1))))
   ), Ast.metaInitial r
 let std: Ast.lam_function E.t = E.empty
   |> E.add "lam" Eval.lam
@@ -212,8 +212,11 @@ let std: Ast.lam_function E.t = E.empty
   |> E.add "*" times
   |> E.add "-" minus
   |> E.add "/" dividedBy
-  |> E.add "=!" (assertNumericalComparisonResult (=))
-  |> E.add "<!" (assertNumericalComparisonResult (<))
+  |> E.add "=!" (assertNumericalComparisonResult (=) "exactly")
+  |> E.add "<!" (assertNumericalComparisonResult (<) "less than")
+  |> E.add "<=!" (assertNumericalComparisonResult (<=) "less than or equal to")
+  |> E.add ">!" (assertNumericalComparisonResult (>) "greater than")
+  |> E.add ">=!" (assertNumericalComparisonResult (>=) "greater than or equal to")
 
 let%expect_test _ = (try
   Eval.printReducedAst std {|
