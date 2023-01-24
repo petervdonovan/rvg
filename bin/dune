@@ -1,5 +1,4 @@
 (executable
  (public_name rvg)
  (name main)
- (modes byte)
  (libraries rvg))

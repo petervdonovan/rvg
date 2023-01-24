@@ -1,3 +1,3 @@
-[[print
-  [[[fold_range {4} {3} {2}] {0}] [lam [(acc) (n)] [[print n]] [[print {
-}]] [+ acc n]]]]]
+[stdlib [mu [] [ctrl [mu []
+  [[println [[[fold_range {4} {3} {5}] {0}] [lam [(acc) (n)] [[println n]] [+ acc n]]]]]
+  [[println [unroll {3} {addi t0 t1 12}]]]]]]]

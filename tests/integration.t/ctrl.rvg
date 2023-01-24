@@ -15,6 +15,12 @@
     DONE:
   }]
   [[unsafe_assert_exact_cycles {3}] assembly]]]
+[def (unroll) [lam [(n num!) (body block!)]
+  [[[fold_range {1} {0} n] {}]
+    [lam [(acc) (_)] {
+      [id acc]
+      [id body]
+    }]]]]
 [def (for) [lam [
     (start reg!) (stop reg!)
     (step num! [>! {0}])
