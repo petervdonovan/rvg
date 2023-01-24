@@ -13,12 +13,12 @@
   good 0
   good 1
   Expected lam of 2 parameters: line 11, col 12 to line 11, col 47
-  Assertion failed: line 6, col 20 to line 6, col 30
+  Assertion failed: line 6, col 3 to line 6, col 12
   $ dune exec -- ../../bin/main.exe stdlib.rvg 4.rvg
   testing lam!
   executing identity
   Expected lam of 1 parameters: line 11, col 12 to line 11, col 47
-  Assertion failed: line 7, col 5 to line 7, col 41
+  Assertion failed: line 6, col 3 to line 6, col 12
   $ dune exec -- ../../bin/main.exe stdlib.rvg 5.rvg
   curried successfully
   first thing to print
@@ -27,7 +27,7 @@
   pass
   7
   Expected a number: line 21, col 18 to line 21, col 45
-  Assertion failed: line 6, col 3 to line 6, col 17
+  Assertion failed: line 6, col 3 to line 6, col 12
   $ dune exec -- ../../bin/main.exe stdlib.rvg 7.rvg
   ok 23
   ok nop
@@ -56,3 +56,7 @@
       add a0, a0, t0
       addi t0, t0 1
       blt t0, t1 LOOP_tJ6slU7Skn
+  $ dune exec --debug-backtraces -- ../../bin/main.exe 12.rvg
+  3
+  7
+  10
