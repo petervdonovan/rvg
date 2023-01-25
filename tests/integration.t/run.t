@@ -12,18 +12,23 @@
   $ dune exec -- ../../bin/main.exe stdlib.rvg 3.rvg
   good 0
   good 1
+  Lam(params=[Var(name=b)], lbody=Name(b); Template(Asm(this should fail))): line 6, col 20 to line 6, col 30
   Expected lam of 2 parameters: line 11, col 12 to line 11, col 47
   Assertion failed: line 6, col 3 to line 6, col 12
   $ dune exec -- ../../bin/main.exe stdlib.rvg 4.rvg
   testing lam!
   executing identity
+  this is not a lam and should error: line 7, col 5 to line 7, col 41
   Expected lam of 1 parameters: line 11, col 12 to line 11, col 47
   Assertion failed: line 6, col 3 to line 6, col 12
   $ dune exec -- ../../bin/main.exe stdlib.rvg 5.rvg
-  line 16, col 7 to line 16, col 19: Unbound name: result_check
+  curried successfully
+  first thing to print
+  second thing to print
   $ dune exec -- ../../bin/main.exe stdlib.rvg 6.rvg
   pass
   7
+  Not a number: line 6, col 3 to line 6, col 17
   Expected a number: line 20, col 18 to line 20, col 45
   Assertion failed: line 6, col 3 to line 6, col 12
   $ dune exec -- ../../bin/main.exe stdlib.rvg 7.rvg
@@ -66,3 +71,8 @@
       addi t0, t1, 12
   $ dune exec -- ../../bin/main.exe 13.rvg
   alphabet soup bishop
+  $ dune exec -- ../../bin/main.exe stdlib.rvg 14.rvg
+  sterling 42
+  y: line 13, col 38 to line 13, col 41
+  Expected a number: line 20, col 18 to line 20, col 45
+  Assertion failed: line 6, col 3 to line 6, col 12

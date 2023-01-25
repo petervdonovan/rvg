@@ -11,11 +11,10 @@
     [lam [] l]
     [fail l {Expected lam of [id k] parameters}]]]]]
 
-[def (->) [lam [(arg_check) (result_check)]
-  [lam [(l arg_check)]
-    [lam [(arg0) (arg1)]
-      {This is very bad! we can only forward a fixed number of args (in this case, 2), so this library function isn't fully general.}
-      [result_check [l arg0 arg1]]]]]]
+[def (->) [lam [(arg-check) (result-check)]
+  [lam [(l arg-check)]
+    [applierify-varargs [lam [(applier)]
+      [result-check [applier l]]]]]]]
 [def (assertify) [lam [(? [lam! {1}]) (description)] [lam [(checkee)]
   [if [? checkee]
     [lam [] checkee]

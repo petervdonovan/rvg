@@ -49,7 +49,7 @@ let print args _ _ closure _ _ r = (
 let fail args _ _ closure _ _ r = (
   assertAtLeastNArgs 1 args r;
   emptyLam closure (fun _ _ _ _ _  _ r  ->
-  args |> List.tl |> List.iter errorReportingPrintExpr;
+  args |> List.iter errorReportingPrintExpr;
   raise (AssertionFail ("Assertion failed: " ^ (CharStream.rangeToString r)))),
   args |> List.hd |> snd
 )
@@ -276,7 +276,9 @@ let%expect_test _ = (try
   |} with
     | AssertionFail s -> print_string s
     | Eval.EvalFail (s, _) -> print_string s);
-  [%expect{| Assertion failed: line 1, col 3 to line 4, col 28 |}]
+  [%expect{|
+    help: line 4, col 18 to line 4, col 24
+    Assertion failed: line 1, col 3 to line 4, col 28 |}]
 
 let%expect_test _ = (try Eval.printReducedAst std {|
     [cycles?
