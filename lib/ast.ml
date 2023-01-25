@@ -54,19 +54,21 @@ and lam_function = (expr list (*args*)
   -> CharStream.range (*lam application expression range*)
   -> expr)
 
-let rec exprToString (e: expr): string = match e with
-  | Name s, _ -> "Name(" ^ s ^ ")"
-  | Var{ name; checks }, _ -> funNotation "Var" (["name=" ^ name] @ (checks |> List.map fst |> List.map exprToString))
-  | Asm s, _ -> "Asm(" ^ s ^ ")"
-  | ParsedAsm asm, _ ->
+let rec exprContentToString (e: expr_content): string = match e with
+  | Name s -> "Name(" ^ s ^ ")"
+  | Var{ name; checks } -> funNotation "Var" (["name=" ^ name] @ (checks |> List.map fst |> List.map exprToString))
+  | Asm s -> "Asm(" ^ s ^ ")"
+  | ParsedAsm asm ->
       funNotation "ParsedAsm" [Assembly.asmToString asm]
-  | Template exprs, _ -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
-  | Lam la, _ -> lamMuToString la
-  | LamApplication { lam; args }, _ -> "LamApplication(lam=" ^
+  | Template exprs -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
+  | Lam la -> lamMuToString la
+  | LamApplication { lam; args } -> "LamApplication(lam=" ^
     exprToString lam ^ ", args=("
     ^ String.concat ", " (List.map exprToString args)
     ^ "))"
-  | Def {dname; dvalue}, _ -> funNotation "Def" [exprToString (Var (fst dname), snd dname); sequenceToString dvalue]
+  | Def {dname; dvalue} -> funNotation "Def" [exprToString (Var (fst dname), snd dname); sequenceToString dvalue]
+and exprToString (e: expr): string = let content, metadata = e in
+  funNotation "E" [exprContentToString content; String.concat ";" (Attributes.elements metadata.attrs)]
 and sequenceToString seq = seq |> List.map exprToString |> String.concat "; "
 and lamMuToString la =
   let { params; lbody; _ } = la in
@@ -207,8 +209,7 @@ let rec exprToParsedAsm env e =
     |> List.map fst
     |> List.rev (* FIXME: Performance issue? *)
     |> List.fold_left (Assembly.prependBlock env) {top=""; middle = []; bottom = ""}
-    |> Assembly.promoteOrDemote env,
-    meta)
+    |> Assembly.promoteOrDemote env, meta)
   | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam" e
   | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e
   | Def _ -> thisIsUnevaluatedOrNotAssembly "def" e
@@ -226,30 +227,30 @@ let printAst text: unit =
 
 let%expect_test _ =
 printAst "[lam [] \"\" ]";
-[%expect{| Lam(params=[], lbody=Name("")) |}]
+[%expect{| E(Lam(params=[], lbody=E(Name(""), )), ) |}]
 
 let%expect_test _ =
   printAst "[lam [(a) (b) (c)] \"\" ]";
-  [%expect{| Lam(params=[Var(name=a)Var(name=b)Var(name=c)], lbody=Name("")) |}]
+  [%expect{| E(Lam(params=[E(Var(name=a), )E(Var(name=b), )E(Var(name=c), )], lbody=E(Name(""), )), ) |}]
 
 let%expect_test _ =
   printAst "[a [lam [] test0] test1 ]";
-  [%expect{| LamApplication(lam=Name(a), args=(Lam(params=[], lbody=Name(test0)), Name(test1))) |}]
+  [%expect{| E(LamApplication(lam=E(Name(a), ), args=(E(Lam(params=[], lbody=E(Name(test0), )), ), E(Name(test1), ))), ) |}]
 
 let%expect_test _ =
   printAst "[a [lam [] [lam [] test0]] test1 ]";
-  [%expect{| LamApplication(lam=Name(a), args=(Lam(params=[], lbody=Lam(params=[], lbody=Name(test0))), Name(test1))) |}]
+  [%expect{| E(LamApplication(lam=E(Name(a), ), args=(E(Lam(params=[], lbody=E(Lam(params=[], lbody=E(Name(test0), )), )), ), E(Name(test1), ))), ) |}]
 
 let%expect_test _ =
   printAst "[[lam [] test2] test3 ]";
-  [%expect{| LamApplication(lam=Lam(params=[], lbody=Name(test2)), args=(Name(test3))) |}]
+  [%expect{| E(LamApplication(lam=E(Lam(params=[], lbody=E(Name(test2), )), ), args=(E(Name(test3), ))), ) |}]
 
 let%expect_test _ =
   printAst "[f alpha {}]";
-  [%expect {| LamApplication(lam=Name(f), args=(Name(alpha), Template())) |}]
+  [%expect {| E(LamApplication(lam=E(Name(f), ), args=(E(Name(alpha), ), E(Template(), ))), ) |}]
 
 let%expect_test _ = printAst "[[lam [(x)] {}] {} ]";
-  [%expect{| LamApplication(lam=Lam(params=[Var(name=x)], lbody=Template()), args=(Template())) |}]
+  [%expect{| E(LamApplication(lam=E(Lam(params=[E(Var(name=x), )], lbody=E(Template(), )), ), args=(E(Template(), ))), ) |}]
 
 let%expect_test _ = handleParseFail (fun () -> printAst "[[lam [(x alpha [lam [(x)] x])] {}] {} ]");
-  [%expect{| LamApplication(lam=Lam(params=[Var(name=x, Lam(params=[Var(name=x)], lbody=Name(x)), Name(alpha))], lbody=Template()), args=(Template())) |}]
+  [%expect{| E(LamApplication(lam=E(Lam(params=[E(Var(name=x, E(Lam(params=[E(Var(name=x), )], lbody=E(Name(x), )), ), E(Name(alpha), )), )], lbody=E(Template(), )), ), args=(E(Template(), ))), ) |}]

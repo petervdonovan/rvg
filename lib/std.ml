@@ -35,23 +35,34 @@ let falseLambda = Ast.Lam {
   params=[]; lbody=[]; env=E.empty;
   f=fun args _ _ _ _ _ r -> assertExactlyNArgs 2 args r; List.nth args 1
 }
-let emptyLam closure f = Ast.Lam {params=[]; lbody=[]; env=closure; f}
+let nargsAttr k = "nargs=" ^ (string_of_int k)
+let varargsAttr = "varargs"
+let hasNargsAttr k (metadata: Ast.metadata) =
+  Ast.Attributes.mem (nargsAttr k) metadata.attrs || Ast.Attributes.mem varargsAttr metadata.attrs
+let emptyLam nargs r closure f = Ast.Lam {params=[]; lbody=[]; env=closure; f=(
+  fun args params lbody closure currentEnv evalSequence r ->
+  assertExactlyNArgs nargs args r;
+  f args params lbody closure currentEnv evalSequence r
+)}, ({attrs=Ast.Attributes.singleton (nargsAttr nargs); r}: Ast.metadata)
+let emptyVarargsLam r closure f = Ast.Lam {params=[]; lbody=[]; env=closure;f},
+  ({attrs=Ast.Attributes.singleton (varargsAttr); r}: Ast.metadata)
+let addattrInternal attr expr =
+  let content, (meta': Ast.metadata) = expr in
+    content, ({attrs = Ast.Attributes.add attr meta'.attrs; r = meta'.r}: Ast.metadata)
 let print args _ _ closure _ _ r = (
   assertExactlyNArgs 1 args r;
   let arg = List.hd args in
-  emptyLam closure (fun _ _ _ _ _ _ _ ->
+  addattrInternal "print" (emptyLam 0 r closure (fun _ _ _ _ _ _ _ ->
   let sideEffectsAllowed = Array.get Sys.argv 1 <> "tokens" in
   (match arg with
   | Ast.ParsedAsm pasm, _ -> if sideEffectsAllowed then Assembly.print pasm; arg
-  | _ -> if sideEffectsAllowed then print_endline (Ast.exprToString arg); arg)),
-  snd arg
+  | _ -> if sideEffectsAllowed then print_endline (Ast.exprToString arg); arg)))
 )
 let fail args _ _ closure _ _ r = (
   assertAtLeastNArgs 1 args r;
-  emptyLam closure (fun _ _ _ _ _  _ r  ->
+  emptyVarargsLam r closure (fun _ _ _ _ _  _ r  ->
   args |> List.iter errorReportingPrintExpr;
-  raise (AssertionFail ("Assertion failed: " ^ (CharStream.rangeToString r)))),
-  args |> List.hd |> snd
+  raise (AssertionFail ("Assertion failed: " ^ (CharStream.rangeToString r))))
 )
 let acceptFragment description args r =
   assertExactlyNArgs 1 args r;
@@ -61,39 +72,34 @@ let acceptFragment description args r =
     s, meta
   | _ -> raise (AssertionFail (description ^ " is not a fragment" ^ (Ast.locationToString attr)))
 let addattr args _ _ closure _ _ r = (
-  let s, meta = acceptFragment "Attribute" args r in
-  emptyLam closure (fun args _ _ _ _ _ r ->
-    assertExactlyNArgs 1 args r;
-    let content, meta' = List.hd args in
-    content, ({attrs = Ast.Attributes.add s meta'.attrs; r = meta'.r}: Ast.metadata)
-  ), meta
+  let s, _ = acceptFragment "Attribute" args r in
+  emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
+    addattrInternal s (List.hd args)
+  )
 )
 let hasattr args _ _ closure _ _ r = (
-  let s, meta = acceptFragment "Attribute" args r in
-  emptyLam closure (fun args _ _ _ _ _ r ->
-    assertExactlyNArgs 1 args r;
+  let s, _ = acceptFragment "Attribute" args r in
+  emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
     let _, meta' = List.hd args in
     (if Ast.Attributes.mem s meta'.attrs then trueLambda else falseLambda), meta'
-  ), meta
+  )
 )
 let isLam args _ _ closure _ _ r = (
   assertExactlyNArgs 1 args r;
   let expectedNParams, meta = getNumericalArg (List.hd args) in
-  emptyLam closure (fun args _ _ _ _ _ r -> (
-    assertExactlyNArgs 1 args r;
+  emptyLam 1 r closure (fun args _ _ _ _ _ _ -> (
     let arg = List.hd args in
     match arg with
-    | Ast.Lam {params; _}, _ ->
-      (if List.length params = expectedNParams then trueLambda else falseLambda), meta
+    | Ast.Lam {params; _}, meta ->
+      (if List.length params = expectedNParams || Ast.Attributes.mem (nargsAttr expectedNParams) meta.attrs || Ast.Attributes.mem varargsAttr meta.attrs then trueLambda else falseLambda), meta
     | _ -> falseLambda, meta
-  )), meta
+  ))
 )
-let lamOf paramChecks _ _ closure _ _ _ = (
+let lamOf paramChecks _ _ closure _ _ r = (
   List.iter (fun e -> match e with
     | Ast.Lam _, _ -> ()
     | _ -> raise (AssertionFail ("Expected lam " ^ Ast.locationToString e))) paramChecks;
-  emptyLam closure (fun args _ _ _ _ _ r ->
-    assertExactlyNArgs 1 args r;
+  emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
     let checkee = List.hd args in
     match checkee with
     | Lam (l: Ast.lam), meta -> (
@@ -108,9 +114,9 @@ let lamOf paramChecks _ _ closure _ _ _ = (
             paramChecks args |> List.map fst
           in f args' params lbody closure' currentEnv evalSequence r
         )}
-      in instrumented, meta)
+      in instrumented, ({attrs=Ast.Attributes.add (nargsAttr nParams) meta.attrs; r=meta.r}: Ast.metadata))
     | _ -> raise (AssertionFail ("Expected lam " ^ Ast.locationToString checkee))
-  ), Ast.metaEmpty
+  )
 )
 let isX predicate args _ _ _ _ _ r  = (
   assertExactlyNArgs 1 args r;
@@ -128,6 +134,7 @@ let isFragment = isX (fun arg -> match arg with
   | _ -> false)
 let isFinishedBlock = isX (fun arg -> match arg with
   | Ast.ParsedAsm Assembly.FinishedBlock _ -> true
+  | Ast.ParsedAsm Assembly.Fragment s when String.trim s = "" -> true
   | _ -> false)
 let isReg args _ _ _ currentEnv _ r  = (
   assertExactlyNArgs 1 args r;
@@ -168,13 +175,11 @@ let exactCycles args _ _ _ currentEnv _ r =
     | None -> raise (AssertionFail "Failed to determine exact number of cycles")
 let unsafeAssertKCycles args _ _ closure currentEnv _ r =
   assertExactlyNArgs 1 args r;
-  emptyLam closure (fun args' _ _ _ _ _ r ->
-    assertExactlyNArgs 1 args' r;
+  emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
     let k, _ = args |> List.hd |> getNumericalArg in
     let asmexpr = args' |> List.hd in
     let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) asmexpr in
-      Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')), metadata),
-      Ast.metaInitial r
+      Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')), metadata)
 let binaryMathOp op args _ _ _ _ _ r =
   assertExactlyNArgs 2 args r;
   let arg0, _ = args |> List.hd |> getNumericalArg in
@@ -187,23 +192,20 @@ let dividedBy = binaryMathOp (/)
 let assertNumericalComparisonResult comparator description args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r;
   let arg0, _ = args |> List.hd |> getNumericalArg in
-  emptyLam closure (fun args _ _ _ _ _ r ->
-    assertExactlyNArgs 1 args r;
+  emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
     let arg1expr = List.hd args in
     let arg1, r1 = arg1expr |> getNumericalArg in
     (if comparator arg1 arg0 then arg1expr else raise (AssertionFail ("Expected " ^ description ^ " " ^ (string_of_int arg0) ^ " but got " ^ (string_of_int arg1) ^ ": " ^ Ast.locationToString (arg1, r1))))
-  ), Ast.metaInitial r
+  )
 let foldRange args _ _ closure _ _ r =
   assertExactlyNArgs 3 args r;
   let args = fun x -> List.nth args x |> getNumericalArg in
   let step, _ = args 0 in
   let start, _ = args 1 in
   let count, _ = args 2 in
-  emptyLam closure (fun args _ _ closure _ _ r -> (
-    assertExactlyNArgs 1 args r;
+  addattrInternal "range" (emptyLam 1 r closure (fun args _ _ closure _ _ r -> (
     let initial = List.hd args in
-    emptyLam closure (fun args _ _ _ currentEnv _ r -> (
-      assertExactlyNArgs 1 args r;
+    emptyLam 1 r closure (fun args _ _ _ currentEnv _ r -> (
       Seq.fold_left
         (fun acc next -> fst (Eval.evalExpr currentEnv (
           Ast.LamApplication {lam=List.hd args; args=[acc;next]}, Ast.metaInitial r
@@ -214,21 +216,20 @@ let foldRange args _ _ closure _ _ r =
           else Some (current, (current + step, n + 1))) (start, 0))
           |> Seq.map (fun x ->
             Ast.ParsedAsm (Assembly.Fragment (string_of_int x)), Ast.metaInitial r))
-    )), Ast.metaInitial r
-  )), Ast.metaInitial r
+    ))
+  )))
 let applierifyVarargs args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r;
   let applyee = List.hd args in
-  emptyLam closure (fun varargs _ _ closure' currentEnv _ r' -> (
+  emptyVarargsLam r closure (fun varargs _ _ closure' currentEnv _ r' -> (
     Eval.evalExpr currentEnv (Ast.LamApplication
-    {lam=applyee; args=[emptyLam closure' (fun args _ _ _ _ _ r'' -> (
-      assertExactlyNArgs 1 args r;
+    {lam=applyee; args=[emptyLam 1 r' closure' (fun args _ _ _ _ _ r'' -> (
       let nestedApplyee = List.hd args in
       Eval.evalExpr currentEnv (
         Ast.LamApplication {lam=nestedApplyee; args=varargs}, Ast.metaInitial r''
       ) |> fst
-    )), Ast.metaInitial r']}, Ast.metaInitial r') |> fst)
-  ), Ast.metaInitial r
+    ))]}, Ast.metaInitial r') |> fst)
+  )
 let std: Ast.lam_function E.t = E.empty
   |> E.add "lam" Eval.lam
   |> E.add "mu" Eval.mu
@@ -265,7 +266,7 @@ let%expect_test _ = (try
   |} with
     | AssertionFail s -> print_string s
     | Eval.EvalFail (s, _) -> print_string s);
-  [%expect{| Expected Lam but got ParsedAsm(Fragment(help)) |}]
+  [%expect{| Expected Lam but got E(ParsedAsm(Fragment(help)), ) |}]
 
 let%expect_test _ = (try
   Eval.printReducedAst std {|
@@ -288,4 +289,4 @@ let%expect_test _ = (try Eval.printReducedAst std {|
       }]
   |} with
     | AssertionFail s -> print_string s);
-  [%expect{| ParsedAsm(Fragment(3)) |}]
+  [%expect{| E(ParsedAsm(Fragment(3)), ) |}]

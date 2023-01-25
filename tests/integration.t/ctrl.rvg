@@ -55,4 +55,19 @@
         [[assembly,cycles false] num-iterations]]
       [assembly,cycles true]]
   }]]
+[def (prologue-or-epilogue) [->
+  [lamof [∘ num! [∘ [>=! {0}] [<! {12}]]]]
+  block!]]
+[def (prologue prologue-or-epilogue) [lam [(n [∘ num! num!])]
+  [[[fold_range {1} {0} n] {addi sp sp [* {4} n]}]
+    [lam [(acc block!) (k num!)] {
+      sw s[id k] [* {4} k](sp)
+      [id acc]
+    }]]]]
+[def (epilogue [-> [lamof num!] block!]) [lam [(n [>=! {0}] [<! {12}])]
+  [[[fold_range {1} {0} n] {addi sp sp [* {-4} n]}]
+    [lam [(acc block!) (k num!)] {
+      [id acc]
+      lw s[id k] [* {4} k](sp)
+    }]]]]
 [program]]

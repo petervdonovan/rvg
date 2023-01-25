@@ -1,0 +1,7 @@
+[stdlib [mu [] [ctrl [mu []
+[def (asm block!) [prologue {5}]]
+[[println {done computing prologue}]]
+[[print asm]]
+[[println {now producing corresponding epilogue}]]
+[[print [epilogue {5}]]]
+]]]]

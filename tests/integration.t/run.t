@@ -12,7 +12,7 @@
   $ dune exec -- ../../bin/main.exe stdlib.rvg 3.rvg
   good 0
   good 1
-  Lam(params=[Var(name=b)], lbody=Name(b); Template(Asm(this should fail))): line 6, col 20 to line 6, col 30
+  E(Lam(params=[E(Var(name=b), )], lbody=E(Name(b), ); E(Template(E(Asm(this should fail), )), )), ): line 6, col 20 to line 6, col 30
   Expected lam of 2 parameters: line 11, col 12 to line 11, col 47
   Assertion failed: line 6, col 3 to line 6, col 12
   $ dune exec -- ../../bin/main.exe stdlib.rvg 4.rvg
@@ -76,3 +76,18 @@
   y: line 13, col 38 to line 13, col 41
   Expected a number: line 20, col 18 to line 20, col 45
   Assertion failed: line 6, col 3 to line 6, col 12
+  $ dune exec -- ../../bin/main.exe stdlib.rvg ctrl.rvg 15.rvg
+  done computing prologue
+      sw s4, 16(sp)
+      sw s3, 12(sp)
+      sw s2, 8(sp)
+      sw s1, 4(sp)
+      sw s0, 0(sp)
+      addi sp, sp, 20
+  now producing corresponding epilogue
+      addi sp, sp, -20
+      lw s0, 0(sp)
+      lw s1, 4(sp)
+      lw s2, 8(sp)
+      lw s3, 12(sp)
+      lw s4, 16(sp)

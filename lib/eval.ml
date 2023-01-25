@@ -108,16 +108,16 @@ let printEndingAsm text =
   text |> Ast.getAst testStd |> evalExpr Environment.empty |> fst |> fun x -> match x with | ParsedAsm pasm, _ -> Assembly.print pasm | _ -> print_endline "did not evaluate to ParsedAsm"
 
 let%expect_test _ = printReducedAst testStd "[lam [] \"\" ]";
-  [%expect{| Lam(params=[], lbody=Name("")) |}]
+  [%expect{| E(Lam(params=[], lbody=E(Name(""), )), ) |}]
 
 let%expect_test _ = printReducedAst testStd "[[lam [] {}]]";
-  [%expect{| ParsedAsm(Fragment()) |}]
+  [%expect{| E(ParsedAsm(Fragment()), ) |}]
 
 let%expect_test _ = printReducedAst testStd "[[lam [(x)] {}] {} ]";
-  [%expect{| ParsedAsm(Fragment()) |}]
+  [%expect{| E(ParsedAsm(Fragment()), ) |}]
 
 let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (fst (Ast.exprToParsedAsm (expectAsm Environment.empty) (Ast.Asm " 12 ", Ast.metaEmpty))), Ast.metaEmpty));
-  [%expect {| ParsedAsm(Fragment( 12 )) |}]
+  [%expect {| E(ParsedAsm(Fragment( 12 )), ) |}]
 
 let%expect_test _ = Ast.printAst {|
   [[lam [(x)] {
@@ -128,12 +128,12 @@ let%expect_test _ = Ast.printAst {|
   }] { 12 }]
   |};
   [%expect {|
-    LamApplication(lam=Lam(params=[Var(name=x)], lbody=Template(Asm(
-        )LamApplication(lam=Lam(params=[Var(name=x)], lbody=Template(Asm(
+    E(LamApplication(lam=E(Lam(params=[E(Var(name=x), )], lbody=E(Template(E(Asm(
+        ), )E(LamApplication(lam=E(Lam(params=[E(Var(name=x), )], lbody=E(Template(E(Asm(
           addi zero zero x
-        ))), args=(Name(x)))Asm(
+        ), )), )), ), args=(E(Name(x), ))), )E(Asm(
         x
-      ))), args=(Template(Asm( 12 )))) |}]
+      ), )), )), ), args=(E(Template(E(Asm( 12 ), )), ))), ) |}]
 
 
 let%expect_test _ = printReducedAst testStd {|
@@ -141,7 +141,7 @@ let%expect_test _ = printReducedAst testStd {|
       addi t0 t1 x
     }] { 12 }]
   |};
-  [%expect {| ParsedAsm(MetaBlock(MetaBlock(IArith(addi, temp-t0, temp-t1,  12 )))) |}]
+  [%expect {| E(ParsedAsm(MetaBlock(MetaBlock(IArith(addi, temp-t0, temp-t1,  12 )))), ) |}]
 
 let%expect_test _ = printReducedAst testStd {|
   [[lam [(x)] {
@@ -152,8 +152,8 @@ let%expect_test _ = printReducedAst testStd {|
   }] { 12 }]
   |};
   [%expect {|
-    ParsedAsm(MetaBlock(MetaBlock(MetaBlock(IArith(addi, Zero, Zero,  12 )))
-    MetaBlock(IArith(slli, temp-t1, temp-t2,  12 )))) |}]
+    E(ParsedAsm(MetaBlock(MetaBlock(MetaBlock(IArith(addi, Zero, Zero,  12 )))
+    MetaBlock(IArith(slli, temp-t1, temp-t2,  12 )))), ) |}]
 
 let%expect_test _ = printReducedAst testStd {|
     [[lam [(x)]
@@ -162,7 +162,7 @@ let%expect_test _ = printReducedAst testStd {|
       a
     ] {addi zero zero 0} ]
   |};
-  [%expect{| ParsedAsm(MetaBlock(IArith(addi, Zero, Zero, 0))) |}]
+  [%expect{| E(ParsedAsm(MetaBlock(IArith(addi, Zero, Zero, 0))), ) |}]
 
 let%expect_test _ = printReducedAst testStd {|
     [
@@ -173,7 +173,7 @@ let%expect_test _ = printReducedAst testStd {|
         {t1}]
       {t2}]
   |};
-  [%expect{| ParsedAsm(MetaBlock(RType(sub, temp-t0, temp-t1, temp-t2))) |}]
+  [%expect{| E(ParsedAsm(MetaBlock(RType(sub, temp-t0, temp-t1, temp-t2))), ) |}]
 
 let%expect_test _ = printReducedAst testStd {|
     [[lam []
@@ -181,7 +181,7 @@ let%expect_test _ = printReducedAst testStd {|
       [def (m) [[lam [(x)] [mu [] {lw x 0(a0)}]] {a0}]]
       [m]]]
   |};
-  [%expect{| ParsedAsm(MetaBlock(Load(lw, temp-t0, temp-a0, 0))) |}]
+  [%expect{| E(ParsedAsm(MetaBlock(Load(lw, temp-t0, temp-a0, 0))), ) |}]
 
 
 let%expect_test _ = printReducedAst testStd {|
@@ -193,7 +193,7 @@ let%expect_test _ = printReducedAst testStd {|
       {a0}]]
     [m]]]
   |};
-  [%expect{| ParsedAsm(MetaBlock(Load(lw, temp-a0, temp-a0, 0))) |}]
+  [%expect{| E(ParsedAsm(MetaBlock(Load(lw, temp-a0, temp-a0, 0))), ) |}]
 
 let%expect_test _ = printReducedAst testStd {|
   {
@@ -202,8 +202,8 @@ let%expect_test _ = printReducedAst testStd {|
   }
   |};
   [%expect{|
-    ParsedAsm(MetaBlock(MetaBlock(Label(START:)
-    Jal(jal, Ra, START)))) |}]
+    E(ParsedAsm(MetaBlock(MetaBlock(Label(START:)
+    Jal(jal, Ra, START)))), ) |}]
 
 let%expect_test _ = printEndingAsm {|
   {
@@ -225,7 +225,7 @@ let%expect_test _ = printReducedAst testStd {|
   [[lam [(x [lam [(la)] [la]])] x]
     [lam [] {hello}]]
   |};
-  [%expect{| ParsedAsm(Fragment(hello)) |}]
+  [%expect{| E(ParsedAsm(Fragment(hello)), ) |}]
 
 let%expect_test _ = printReducedAst testStd {|
   {
@@ -243,7 +243,7 @@ let%expect_test _ = printReducedAst testStd {|
   }
 |};
   [%expect {|
-    ParsedAsm(MetaBlock(MetaBlock(UType(lui, temp-t1, 0x40000)
+    E(ParsedAsm(MetaBlock(MetaBlock(UType(lui, temp-t1, 0x40000)
     UType(auipc, temp-a0, 0x12345)
     MetaBlock(UType(lui, temp-t1, 524288)
     IArith(addi, temp-t1, Zero, 1))
@@ -254,4 +254,4 @@ let%expect_test _ = printReducedAst testStd {|
     Jalr(jalr, Zero, Ra, 0)
     IArith(csrrw, Zero, save-s6, 0x51e)
     IArith(csrrw, temp-t0, Sp, 0x51e)
-    IArith(csrrs, save-s0, Zero, 0xb00)))) |}]
+    IArith(csrrs, save-s0, Zero, 0xb00)))), ) |}]

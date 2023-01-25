@@ -344,17 +344,15 @@ let prependBlock env acc prependable =
 (* Blocks must have a middle; else they are fragments;
    they must have sticky ends; else they are finished *)
 let rec promoteOrDemote env b =
-    if List.length b.middle = 0 then Fragment b.top
-    else if String.trim b.top = ""
-      then if String.trim b.bottom = ""
-        then FinishedBlock (MetaBlock b.middle |> finishedBlockOf)
-      else match tryParse env b.bottom with
-      | Some inst -> promoteOrDemote env
-        {top = ""; middle = b.middle @ [inst |> finishedBlockOf]; bottom = ""}
-      | None -> Block b
-    else match tryParse env b.top with
-      | Some instr -> promoteOrDemote env
-        {top = ""; middle = b.middle @ [instr |> finishedBlockOf]; bottom = ""}
+  if String.trim b.top <> "" then match tryParse env b.top with
+    | Some instr -> promoteOrDemote env
+      {top = ""; middle = [instr |> finishedBlockOf] @ b.middle; bottom = ""}
+    | None -> if List.length b.middle = 0 then Fragment b.top else Block b
+  else if String.trim b.bottom = ""
+      then if List.length b.middle <> 0 then FinishedBlock (MetaBlock b.middle |> finishedBlockOf) else Fragment (b.top ^ b.bottom)
+    else match tryParse env b.bottom with
+    | Some inst -> promoteOrDemote env
+      {top = ""; middle = b.middle @ [inst |> finishedBlockOf]; bottom = ""}
     | None -> Block b
 let parse acc env asm = String.to_seq asm
   |> Seq.fold_left (append env) acc
