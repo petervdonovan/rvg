@@ -1,0 +1,10 @@
+[mu [(program)]
+[def (getter!) [hasattr! {getter}]]
+[def (regdata!) [∘ [hasattr! {regdata}] [lamof getter!]]]
+[def (regdata-prefix getter!) [lam [(regdata regdata!)] [
+    regdata [lam [(prefix) (count)] prefix]]]]
+[def (regdata-count  getter!) [lam [(regdata regdata!)] [
+    regdata [lam [(prefix) (count)] count ]]]]
+[def (savereg) [[addattr {regdata}]
+  [lam l]]]
+[program]]
