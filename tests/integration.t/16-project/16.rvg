@@ -1,0 +1,7 @@
+[stdlib [mu []
+  [[print! [cycles {
+    addi zero zero 9
+    nop
+    nop
+  }]]]
+]]
