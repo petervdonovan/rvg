@@ -1,6 +1,6 @@
 let evalFile env f =
-  let ic = open_in f in
-  try (let evaluated = ic |> Rvg.CharStream.inputChannelToSeq
+  let s, ic = Rvg.CharStream.fromFile f in
+  try (let evaluated = s
       |> Rvg.Ast.parseTopLevel Rvg.Std.stdFun
       |> Rvg.Eval.evalExpr env |> fst
     in let result = Rvg.Eval.Environment.add
@@ -14,9 +14,9 @@ let evalFile env f =
 let () =
   try ignore(
     Array.fold_left
-    (fun env f -> if String.ends_with ~suffix:".rvg" f then evalFile env f else env)
+    (fun env f -> evalFile env f)
     Rvg.Std.std
-    (Array.sub Sys.argv 1 (Array.length Sys.argv - 1)))
+    (let nskipped = 1 + Rvg.SideEffects.nargs in Array.sub Sys.argv nskipped (Array.length Sys.argv - nskipped)))
   with e ->
     (match e with
     | Rvg.Ast.ParseFail (s, (p: Rvg.CharStream.position)) -> print_endline (

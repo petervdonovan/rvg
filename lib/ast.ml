@@ -12,8 +12,8 @@ let metaInitial r = {attrs=Attributes.empty;r}
 let metaEmpty = {
   attrs = Attributes.empty;
   r = {
-    startInclusive = {zeroBasedLine = 0; zeroBasedCol = 0};
-    endExclusive = {zeroBasedLine = 0; zeroBasedCol = 0};
+    startInclusive = {zeroBasedLine = 0; zeroBasedCol = 0; file=""};
+    endExclusive = {zeroBasedLine = 0; zeroBasedCol = 0; file=""};
   }
 }
 type expr_content =
@@ -214,11 +214,10 @@ let handleParseFail runnable = try runnable () with e -> match e with
   | ParseFail (s, (p: CharStream.position)) -> print_endline (
     "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s); raise e
   | _ -> raise e
-let parseFile std ic = parseTopLevel std (CharStream.inputChannelToSeq ic)
 let testStd = Environment.empty
   |> Environment.add "lam" (fun _ _ _ _ _ _ _ -> Template [], metaEmpty)
   |> Environment.add "mu" (fun _ _ _ _ _ _ _ -> Template [], metaEmpty)
-let getAst testStd text = text |> (CharStream.fromString CharStream.origin) |> parseTopLevel testStd
+let getAst testStd text = text |> (CharStream.fromString (CharStream.origin "")) |> parseTopLevel testStd
 let printAst text: unit =
   text |> getAst testStd |> exprToString |> print_endline
 

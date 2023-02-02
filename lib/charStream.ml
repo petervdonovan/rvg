@@ -5,6 +5,7 @@ exception StreamException of string
 type position = {
   zeroBasedLine: int;
   zeroBasedCol: int;
+  file: string
 }
 type range = {
   startInclusive: position;
@@ -12,42 +13,45 @@ type range = {
 }
 let posToString p = "line " ^ (string_of_int p.zeroBasedLine) ^ ", col " ^ (string_of_int p.zeroBasedCol)
 let rangeToString r = posToString r.startInclusive ^ " to " ^ (posToString r.endExclusive)
-let origin = {zeroBasedLine = 0; zeroBasedCol = 0}
+let origin file = {zeroBasedLine = 0; zeroBasedCol = 0; file}
 let incrementedCol p =
-  {zeroBasedLine = p.zeroBasedLine; zeroBasedCol = p.zeroBasedCol+1}
+  {zeroBasedLine = p.zeroBasedLine; zeroBasedCol = p.zeroBasedCol+1; file = p.file}
 let incrementedLine p =
-  {zeroBasedLine = p.zeroBasedLine + 1; zeroBasedCol = 0}
+  {zeroBasedLine = p.zeroBasedLine + 1; zeroBasedCol = 0; file = p.file}
 let singleCharRange p =
   {startInclusive=p; endExclusive=incrementedCol p}
-let lessThan p' p = p.zeroBasedLine < p'.zeroBasedLine || p.zeroBasedLine = p'.zeroBasedLine && p.zeroBasedCol < p'.zeroBasedCol
+let lessThan p' p = (p.zeroBasedLine < p'.zeroBasedLine) || (p.zeroBasedLine = p'.zeroBasedLine && p.zeroBasedCol < p'.zeroBasedCol)
 let contains p r =
   lessThan (incrementedCol p) r.startInclusive && lessThan r.endExclusive p
-type t = {s: char Seq.t; current: position; previous: position Option.t}
+type t = {s: char Seq.t; current: position; previous: position Option.t; file: string}
 
 let unconsp spp =
-  let {s;current;_} = spp in
+  let {s;current;file;_} = spp in
   match Seq.uncons s with
   | Some (c, s') -> Some (c, {
     s=s';
     current=(if c = '\n' then {
         zeroBasedLine = current.zeroBasedLine + 1;
-        zeroBasedCol = 0
+        zeroBasedCol = 0;
+        file
       } else {
         zeroBasedLine = current.zeroBasedLine;
         zeroBasedCol = current.zeroBasedCol + 1;
+        file
       });
-    previous=Some current
+    previous=Some current;
+    file
   }, current)
   | None -> None
 let uncons spp = match unconsp spp with
   | Some (c, spp', _) -> Some (c, spp')
   | None -> None
 let cons c (sp: t) =
-  let {s;current = _;previous} = sp in
+  let {s;current = _; previous; file} = sp in
   match previous with
-  | Some pos -> let s' = Seq.cons c s in {s=s';current=pos;previous=None}
+  | Some pos -> let s' = Seq.cons c s in {s=s'; current=pos; previous=None; file}
   | None -> raise (StreamException "Multiple consecutive cons to stream")
-let iter f spp = let {s; current = _; previous = _} = spp in Seq.iter f s
+let iter f spp = let {s; _} = spp in Seq.iter f s
 
 let rec takeWhileRec pred acc r s =
   match unconsp s with
@@ -74,7 +78,7 @@ let rec parseTokenRec stream startInclusive current: (string * t * range) option
           else Some (current, cons c s, {startInclusive; endExclusive = incrementedCol p})
       else parseTokenRec s startInclusive (current ^ String.make 1 c)
     | None -> if current = "" then None else
-      let {s = _;current = _ ; previous} = stream in match previous with
+      let {previous; _} = stream in match previous with
       | Some p -> let endExclusive = incrementedCol p in
         Some (current, stream, {
           startInclusive;
@@ -86,15 +90,16 @@ let parseToken stream =
     | Some (c, s, p) -> parseTokenRec (cons c s) p ""
     | None -> None
 
-let inputChannelToSeq ic = {
+let fromFile f = let ic = open_in f in {
   s = (Seq.of_dispenser (fun () -> (
   try Some (input_char ic) with
     End_of_file -> None
   )));
-  current=origin;
-  previous=None
-}
-let fromString p s = {s = String.to_seq s; current = p; previous = None}
+  current=origin f;
+  previous=None;
+  file=f
+}, ic
+let fromString p s = {s = String.to_seq s; current = p; previous = None; file = ""}
 let charSeqToString s =
   let b = Buffer.create 16 in
     iter (Buffer.add_char b) s;

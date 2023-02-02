@@ -264,7 +264,7 @@ let parseRdcycle env opc s =
     opc="csrrs", r'; rd=nameToReg env (rd, r'); rs1=Zero r; imm="0xb00", r
   })))
 let tryParse env str =
-  let s = CharStream.fromString origin str in
+  let s = CharStream.fromString (origin "" (*this is wrong*)) str in
   match parseToken s with
   | Some (opcode, s', r) ->
     (let pred = NameSet.mem opcode in (
