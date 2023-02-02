@@ -1,7 +1,7 @@
 let evalFile env f =
   let ic = open_in f in
   try (let evaluated = ic |> Rvg.CharStream.inputChannelToSeq
-      |> Rvg.Ast.parseTopLevel Rvg.Std.std
+      |> Rvg.Ast.parseTopLevel Rvg.Std.stdFun
       |> Rvg.Eval.evalExpr env |> fst
     in let result = Rvg.Eval.Environment.add
       (f |> Filename.basename |> Filename.remove_extension)
@@ -15,7 +15,7 @@ let () =
   try ignore(
     Array.fold_left
     (fun env f -> if String.ends_with ~suffix:".rvg" f then evalFile env f else env)
-    Rvg.Eval.Environment.empty
+    Rvg.Std.std
     (Array.sub Sys.argv 1 (Array.length Sys.argv - 1)))
   with e ->
     (match e with

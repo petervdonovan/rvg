@@ -5,7 +5,13 @@
   $ dune exec -- ../../bin/main.exe 1-multiple-files/a.rvg 1-multiple-files/b.rvg
       addi zero, zero, 0
   $ dune exec -- ../../bin/main.exe tokens 0.rvg
-  {"kind": "function", "modifier": "defaultLibrary", "startInclusive": [0, 2], "endExclusive": [0, 7] }
+  {"kind": "string", "modifier": "", "range": [[4, 7], [4, 9]] }
+  {"kind": "function", "modifier": "", "range": [[4, 5], [4, 6]] }
+  {"kind": "string", "modifier": "", "range": [[6, 13], [6, 15]] }
+  {"kind": "string", "modifier": "", "range": [[2, 7], [2, 9]] }
+  {"kind": "function", "modifier": "", "range": [[2, 5], [2, 6]] }
+  {"kind": "string", "modifier": "", "range": [[6, 13], [6, 15]] }
+  {"kind": "function", "modifier": "defaultLibrary", "range": [[0, 2], [0, 7]] }
   $ dune exec -- ../../bin/main.exe stdlib.rvg 2.rvg
   a ok
   b ok
@@ -59,7 +65,7 @@
       add a0, a0, t0
       addi t0, t0, 1
       blt t0, t1, LOOP_tJ6slU7Skn
-  $ dune exec -- ../../bin/main.exe ctrl.rvg stdlib.rvg ../../bin/main.exe 12.rvg
+  $ dune exec -- ../../bin/main.exe stdlib.rvg ctrl.rvg 12.rvg
   3
   7
   11

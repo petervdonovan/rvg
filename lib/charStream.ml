@@ -19,7 +19,9 @@ let incrementedLine p =
   {zeroBasedLine = p.zeroBasedLine + 1; zeroBasedCol = 0}
 let singleCharRange p =
   {startInclusive=p; endExclusive=incrementedCol p}
-
+let lessThan p' p = p.zeroBasedLine < p'.zeroBasedLine || p.zeroBasedLine = p'.zeroBasedLine && p.zeroBasedCol < p'.zeroBasedCol
+let contains p r =
+  lessThan (incrementedCol p) r.startInclusive && lessThan r.endExclusive p
 type t = {s: char Seq.t; current: position; previous: position Option.t}
 
 let unconsp spp =
@@ -115,6 +117,3 @@ let get3TokensWithThirdTokenInParens s =
       else Some (regR, immR, rs2)
     | None -> None)
   | None -> None
-let announceToken kind modifier (r: range) =
-  let posToList (p: position) = "[" ^ (string_of_int p.zeroBasedLine) ^ ", " ^ (string_of_int p.zeroBasedCol) ^ "]" in
-  if (Array.get Sys.argv 1 = "tokens") then print_endline ("{\"kind\": \"" ^ kind ^ "\", \"modifier\": \"" ^ modifier ^ "\", \"startInclusive\": " ^ posToList r.startInclusive ^ ", \"endExclusive\": " ^ posToList r.endExclusive ^ " }")

@@ -53,10 +53,7 @@ let print args _ _ closure _ _ r = (
   assertExactlyNArgs 1 args r;
   let arg = List.hd args in
   addattrInternal "print" (emptyLam 0 r closure (fun _ _ _ _ _ _ _ ->
-  let sideEffectsAllowed = Array.get Sys.argv 1 <> "tokens" in
-  (match arg with
-  | Ast.ParsedAsm pasm, _ -> if sideEffectsAllowed then Assembly.print pasm; arg
-  | _ -> if sideEffectsAllowed then print_endline (Ast.exprToString arg); arg)))
+  SideEffects.print arg))
 )
 let fail args _ _ closure _ _ r = (
   assertAtLeastNArgs 1 args r;
@@ -230,7 +227,7 @@ let applierifyVarargs args _ _ closure _ _ r =
       ) |> fst
     ))]}, Ast.metaInitial r') |> fst)
   )
-let std: Ast.lam_function E.t = E.empty
+let stdFun: Ast.lam_function E.t = E.empty
   |> E.add "lam" Eval.lam
   |> E.add "mu" Eval.mu
   |> E.add "print" print
@@ -257,8 +254,10 @@ let std: Ast.lam_function E.t = E.empty
   |> E.add "fold_range" foldRange
   |> E.add "applierify-varargs" applierifyVarargs
 
+let std = E.map (fun f -> addattrInternal "std" (Ast.Lam {params=[]; lbody=[]; env=E.empty; f}, Ast.metaEmpty)) stdFun
+
 let%expect_test _ = (try
-  Eval.printReducedAst std {|
+  Eval.printReducedAst stdFun std {|
   [[
     [lam [(true) (false)] true]
     {help}
@@ -269,7 +268,7 @@ let%expect_test _ = (try
   [%expect{| Expected Lam but got E(ParsedAsm(Fragment(help)), ) |}]
 
 let%expect_test _ = (try
-  Eval.printReducedAst std {|
+  Eval.printReducedAst stdFun std {|
   [[
     [lam [(true) (false)] [false]]
     [lam [] {help}]
@@ -281,7 +280,7 @@ let%expect_test _ = (try
     help: line 4, col 18 to line 4, col 24
     Assertion failed: line 1, col 3 to line 4, col 28 |}]
 
-let%expect_test _ = (try Eval.printReducedAst std {|
+let%expect_test _ = (try Eval.printReducedAst stdFun std {|
     [cycles?
       {
         lw t0 0(a1)
