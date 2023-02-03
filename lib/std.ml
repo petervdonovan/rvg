@@ -1,13 +1,13 @@
 module E = Map.Make(String)
 
-exception IllegalArgument of string
-exception WrongNumberOfArgs of string
-exception AssertionFail of string
+exception IllegalArgument of string * CharStream.range
+exception WrongNumberOfArgs of string * CharStream.range
+exception AssertionFail of string * CharStream.range
 
 let assertNArgs pred description args r: unit =
   let len = List.length args in
   if pred len
-    then raise (WrongNumberOfArgs ("Expected " ^ description ^ " arguments, but got " ^ (string_of_int len) ^ " arguments: " ^ (args |> List.map Ast.exprToString |> String.concat ", ") ^ (CharStream.rangeToString r)))
+    then raise (WrongNumberOfArgs ("Expected " ^ description ^ " arguments, but got " ^ (string_of_int len) ^ " arguments: " ^ (args |> List.map Ast.exprToString |> String.concat ", "), r))
     else ()
 let assertExactlyNArgs n args r =
   assertNArgs ((<>) n) ("exactly " ^ (string_of_int n)) args r
@@ -17,12 +17,12 @@ let getStringArgOpt arg =
   match arg with
   | Ast.ParsedAsm (Assembly.Fragment n), meta -> Some (n, meta)
   | _ -> None
-let getNumericalArg arg =
+let getNumericalArg r arg =
   match getStringArgOpt arg with
   | Some (n, meta) -> (match int_of_string_opt n with
-    | None -> raise (IllegalArgument ("\"" ^ n ^ "\" is not a number"))
+    | None -> raise (IllegalArgument ("\"" ^ n ^ "\" is not a number", r))
     | Some k -> k, meta)
-  | _ -> raise (IllegalArgument ("Expected numerical arg, but got expression of the wrong type: " ^ (Ast.locationToString arg)))
+  | _ -> raise (IllegalArgument ("Expected numerical arg, but got expression of the wrong type", ((snd arg): Ast.metadata).r))
 let errorReportingPrintExpr e =
   print_endline ((match getStringArgOpt e with
   | Some (s, _) -> s
@@ -59,7 +59,7 @@ let fail args _ _ closure _ _ r = (
   assertAtLeastNArgs 1 args r;
   emptyVarargsLam r closure (fun _ _ _ _ _  _ r  ->
   args |> List.iter errorReportingPrintExpr;
-  raise (AssertionFail ("Assertion failed: " ^ (CharStream.rangeToString r))))
+  raise (AssertionFail ("Assertion failed", r)))
 )
 let acceptFragment description args r =
   assertExactlyNArgs 1 args r;
@@ -67,7 +67,7 @@ let acceptFragment description args r =
   match attr with
   | Ast.ParsedAsm Assembly.Fragment s, meta ->
     s, meta
-  | _ -> raise (AssertionFail (description ^ " is not a fragment" ^ (Ast.locationToString attr)))
+  | _ -> raise (AssertionFail (description ^ " is not a fragment", r))
 let addattr args _ _ closure _ _ r = (
   let s, _ = acceptFragment "Attribute" args r in
   emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
@@ -83,7 +83,7 @@ let hasattr args _ _ closure _ _ r = (
 )
 let isLam args _ _ closure _ _ r = (
   assertExactlyNArgs 1 args r;
-  let expectedNParams, meta = getNumericalArg (List.hd args) in
+  let expectedNParams, meta = getNumericalArg r (List.hd args) in
   emptyLam 1 r closure (fun args _ _ _ _ _ _ -> (
     let arg = List.hd args in
     match arg with
@@ -95,24 +95,24 @@ let isLam args _ _ closure _ _ r = (
 let lamOf paramChecks _ _ closure _ _ r = (
   List.iter (fun e -> match e with
     | Ast.Lam _, _ -> ()
-    | _ -> raise (AssertionFail ("Expected lam " ^ Ast.locationToString e))) paramChecks;
-  emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
+    | _ -> raise (AssertionFail ("Expected lam ", r))) paramChecks;
+  emptyLam 1 r closure (fun args _ _ _ _ _ r ->
     let checkee = List.hd args in
     match checkee with
     | Lam (l: Ast.lam), meta -> (
       let nParams = List.length paramChecks in
       (let actualNParams = List.length l.params in
-      (if actualNParams <> nParams then raise (AssertionFail ("Expected " ^ (string_of_int nParams) ^ " params, not " ^ (string_of_int actualNParams) ^ " " ^ Ast.locationToString checkee))));
+      (if actualNParams <> nParams then raise (AssertionFail ("Expected " ^ (string_of_int nParams) ^ " params, not " ^ (string_of_int actualNParams) ^ " ", r))));
       let ({params; lbody; env; f}: Ast.lam) = l in
       let instrumented = Ast.Lam {params; lbody; env; f=fun args params lbody closure' currentEnv evalSequence r -> (
-          (if List.length args <> nParams then raise (AssertionFail ("Wrong number of args: " ^ CharStream.rangeToString r)));
+          (if List.length args <> nParams then raise (AssertionFail ("Wrong number of args: ", r)));
           let args' = List.map2
             (fun paramCheck arg -> Eval.evalExpr closure (Ast.LamApplication {lam=paramCheck; args=[arg]}, snd arg))
             paramChecks args |> List.map fst
           in f args' params lbody closure' currentEnv evalSequence r
         )}
       in instrumented, ({attrs=Ast.Attributes.add (nargsAttr nParams) meta.attrs; r=meta.r}: Ast.metadata))
-    | _ -> raise (AssertionFail ("Expected lam " ^ Ast.locationToString checkee))
+    | _ -> raise (AssertionFail ("Expected lam ", r))
   )
 )
 let isX predicate args _ _ _ _ _ r  = (
@@ -143,18 +143,18 @@ let isReg args _ _ _ currentEnv _ r  = (
   | _ -> falseLambda, meta')
 let unsafeAssertKCyclesFb k (f: Assembly.finished_block): Assembly.finished_block = (
   {content=f.content; provides=f.provides; totalCycles = Some k; cyclesMod=f.cyclesMod})
-let rec getCycles (f: Assembly.finished_block) =
+let rec getCycles r (f: Assembly.finished_block) =
   let ({content; provides; totalCycles; cyclesMod}: Assembly.finished_block) = f in
   let totalCycles' = (match totalCycles with
   | Some k -> k
   | None -> (match f.content with
     | Assembly.Instruction i -> (match HardwareTable.cyclesOf i with
       | Some k -> k
-      | None -> raise (AssertionFail "Failed to determine exact number of cycles"))
-    | Assembly.MetaBlock mb -> List.fold_left (+) 0 (List.map getCycles mb |> List.map snd)))
+      | None -> raise (AssertionFail ("Failed to determine exact number of cycles", r)))
+    | Assembly.MetaBlock mb -> List.fold_left (+) 0 (List.map (getCycles r) mb |> List.map snd)))
   in ({content; provides; totalCycles=Some totalCycles'; cyclesMod}: Assembly.finished_block), totalCycles'
-let getFinishedBlock env asmexpr =
-  let failure = (IllegalArgument ("Expected argument of type FinishedBlock but got " ^ (Ast.exprToString asmexpr))) in
+let getFinishedBlock env r asmexpr =
+  let failure = (IllegalArgument ("Expected argument of type FinishedBlock but got " ^ (Ast.exprToString asmexpr), r)) in
   match asmexpr with
   | Ast.ParsedAsm pasm, metadata -> (match pasm with
     | Assembly.FinishedBlock asmtem' -> asmtem', metadata
@@ -166,30 +166,30 @@ let getFinishedBlock env asmexpr =
 let exactCycles args _ _ _ currentEnv _ r =
   assertExactlyNArgs 1 args r;
   let asmexpr = args |> List.hd in
-  let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) asmexpr in
-    let _, k = getCycles asmtem' in
+  let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) r asmexpr in
+    let _, k = getCycles r asmtem' in
       Ast.ParsedAsm (Assembly.Fragment (string_of_int k)), metadata
 let safeAssertKCycles args _ _ closure currentEnv _ r =
   assertExactlyNArgs 1 args r;
-  let k, _ = args |> List.hd |> getNumericalArg in
+  let k, _ = args |> List.hd |> getNumericalArg r in
   emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
-  args' |> List.hd |> getFinishedBlock (Eval.expectAsm currentEnv)
-  |> fst |> getCycles |> (
+  args' |> List.hd |> getFinishedBlock (Eval.expectAsm currentEnv) r
+  |> fst |> getCycles r |> (
     fun (x, k') ->
       if k = k' then Ast.ParsedAsm (Assembly.FinishedBlock x)
-      else raise (AssertionFail ("Expected " ^ (string_of_int k) ^ " cycles but got " ^ (string_of_int k')))),
+      else raise (AssertionFail ("Expected " ^ (string_of_int k) ^ " cycles but got " ^ (string_of_int k'), r))),
   args |> List.hd |> snd)
 let unsafeAssertKCycles args _ _ closure currentEnv _ r =
   assertExactlyNArgs 1 args r;
   emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
-    let k, _ = args |> List.hd |> getNumericalArg in
+    let k, _ = args |> List.hd |> getNumericalArg r in
     let asmexpr = args' |> List.hd in
-    let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) asmexpr in
+    let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) r asmexpr in
       Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')), metadata)
 let binaryMathOp op args _ _ _ _ _ r =
   assertExactlyNArgs 2 args r;
-  let arg0, _ = args |> List.hd |> getNumericalArg in
-  let arg1, _ = List.nth args 1 |> getNumericalArg in
+  let arg0, _ = args |> List.hd |> getNumericalArg r in
+  let arg1, _ = List.nth args 1 |> getNumericalArg r in
   Ast.ParsedAsm (Assembly.Fragment (string_of_int (op arg0 arg1))), Ast.metaInitial r
 let plus = binaryMathOp (+)
 let minus = binaryMathOp (-)
@@ -197,15 +197,15 @@ let times = binaryMathOp ( * )
 let dividedBy = binaryMathOp (/)
 let assertNumericalComparisonResult comparator description args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r;
-  let arg0, _ = args |> List.hd |> getNumericalArg in
+  let arg0, _ = args |> List.hd |> getNumericalArg r in
   emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
     let arg1expr = List.hd args in
-    let arg1, r1 = arg1expr |> getNumericalArg in
-    (if comparator arg1 arg0 then arg1expr else raise (AssertionFail ("Expected " ^ description ^ " " ^ (string_of_int arg0) ^ " but got " ^ (string_of_int arg1) ^ ": " ^ Ast.locationToString (arg1, r1))))
+    let arg1, r1 = arg1expr |> getNumericalArg r in
+    (if comparator arg1 arg0 then arg1expr else raise (AssertionFail ("Expected " ^ description ^ " " ^ (string_of_int arg0) ^ " but got " ^ (string_of_int arg1), r1.r)))
   )
 let foldRange args _ _ closure _ _ r =
   assertExactlyNArgs 3 args r;
-  let args = fun x -> List.nth args x |> getNumericalArg in
+  let args = fun x -> List.nth args x |> getNumericalArg r in
   let step, _ = args 0 in
   let start, _ = args 1 in
   let count, _ = args 2 in
@@ -273,7 +273,7 @@ let%expect_test _ = (try
     {help}
     [lam [] [fail {help}]]]]
   |} with
-    | AssertionFail s -> print_string s
+    | AssertionFail (s, r) -> print_endline s; print_endline (CharStream.rangeToString r)
     | Eval.EvalFail (s, _) -> print_string s);
   [%expect{| Expected Lam but got E(ParsedAsm(Fragment(help)), ) |}]
 
@@ -284,11 +284,12 @@ let%expect_test _ = (try
     [lam [] {help}]
     [lam [] [fail {help}]]]]
   |} with
-    | AssertionFail s -> print_string s
-    | Eval.EvalFail (s, _) -> print_string s);
+    | AssertionFail (s, r) -> print_endline s; print_endline (CharStream.rangeToString r)
+    | Eval.EvalFail (s, _) -> print_endline s);
   [%expect{|
     help: line 4, col 18 to line 4, col 24
-    Assertion failed: line 1, col 3 to line 4, col 28 |}]
+    Assertion failed
+    line 1, col 3 to line 4, col 28 |}]
 
 let%expect_test _ = (try Eval.printReducedAst stdFun std {|
     [cycles?
@@ -297,5 +298,5 @@ let%expect_test _ = (try Eval.printReducedAst stdFun std {|
         addi t0 t0 12
       }]
   |} with
-    | AssertionFail s -> print_string s);
+    | AssertionFail (s, r) -> print_endline s; print_endline (CharStream.rangeToString r));
   [%expect{| E(ParsedAsm(Fragment(3)), ) |}]

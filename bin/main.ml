@@ -11,6 +11,10 @@ let evalFile env f =
     close_in_noerr ic;
     raise e
 
+let printMessageRange s r = print_endline (
+    (Rvg.CharStream.rangeToString r) ^ ": " ^ s
+  )
+
 let () =
   try ignore(
     Array.fold_left
@@ -21,8 +25,6 @@ let () =
     (match e with
     | Rvg.Ast.ParseFail (s, (p: Rvg.CharStream.position)) -> print_endline (
       "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s)
-    | Rvg.Eval.EvalFail (s, r) -> print_endline (
-      (Rvg.CharStream.rangeToString r) ^ ": " ^ s
-    )
-    | Rvg.Std.AssertionFail s -> print_endline s
+    | Rvg.Eval.EvalFail (s, r) -> printMessageRange s r
+    | Rvg.Std.AssertionFail (s, r) -> printMessageRange s r
     | _ -> raise e)

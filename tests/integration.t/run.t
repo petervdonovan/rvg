@@ -20,13 +20,13 @@
   good 1
   E(Lam(params=[E(Var(name=b), )], lbody=E(Name(b), ); E(Template(E(Asm(this should fail), )), )), ): line 6, col 20 to line 6, col 30
   Expected lam of 2 parameters: line 11, col 12 to line 11, col 47
-  Assertion failed: line 6, col 3 to line 6, col 12
+  line 6, col 3 to line 6, col 12: Assertion failed
   $ dune exec -- ../../bin/main.exe stdlib.rvg 4.rvg
   testing lam!
   executing identity
   this is not a lam and should error: line 7, col 5 to line 7, col 41
   Expected lam of 1 parameters: line 11, col 12 to line 11, col 47
-  Assertion failed: line 6, col 3 to line 6, col 12
+  line 6, col 3 to line 6, col 12: Assertion failed
   $ dune exec -- ../../bin/main.exe stdlib.rvg 5.rvg
   curried successfully
   first thing to print
@@ -36,7 +36,7 @@
   7
   Not a number: line 6, col 3 to line 6, col 17
   Expected a number: line 20, col 18 to line 20, col 45
-  Assertion failed: line 6, col 3 to line 6, col 12
+  line 6, col 3 to line 6, col 12: Assertion failed
   $ dune exec -- ../../bin/main.exe stdlib.rvg 7.rvg
   ok 23
   ok nop
@@ -50,7 +50,7 @@
       addi t0, t0, 4
       add t0, t0, t1
       addi t0, t0, 67
-  Expected exactly 3 but got 4: line 4, col 17 to line 8, col 1
+  line 13, col 2 to line 13, col 14: Expected 3 cycles but got 4
   $ dune exec -- ../../bin/main.exe 9.rvg
   15
   $ dune exec -- ../../bin/main.exe stdlib.rvg ctrl.rvg 10.rvg
@@ -81,7 +81,7 @@
   sterling 42
   y: line 13, col 38 to line 13, col 41
   Expected a number: line 20, col 18 to line 20, col 45
-  Assertion failed: line 6, col 3 to line 6, col 12
+  line 6, col 3 to line 6, col 12: Assertion failed
   $ dune exec -- ../../bin/main.exe stdlib.rvg ctrl.rvg 15.rvg
   done computing prologue
       sw s4, 16(sp)
@@ -98,3 +98,4 @@
       lw s3, 12(sp)
       lw s4, 16(sp)
   $ dune exec -- ../../bin/main.exe hover 3 10 15.rvg stdlib.rvg ctrl.rvg 15.rvg
+  {"attrs": [], "typeUnionOf": ["block"], "cycles": 6, "cyclesMod": [], "range": { "file": "15.rvg", "range": [[3, 8], [3, 12]] }}
