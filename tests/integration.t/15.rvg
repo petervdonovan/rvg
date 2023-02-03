@@ -1,5 +1,5 @@
 [stdlib [mu [] [ctrl [mu []
-[def (asm block!) [prologue {5}]]
+[def (asm block! [cycles! {6}]) [prologue {5}]]
 [[println {done computing prologue}]]
 [[print asm]]
 [[println {now producing corresponding epilogue}]]

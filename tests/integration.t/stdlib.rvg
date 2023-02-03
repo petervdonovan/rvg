@@ -34,7 +34,6 @@
     [lam [(get bool!)]
       [get a b]]]]]
 [def (pair!) [hasattr! {pair}]]
-[def (cycles!) [lam [(k num!)] [lam [(b block!)] [[=! k] [cycles? b]] b]]]
 [def (range!) [hasattr! {range}]]
 [def (println) [lam [(s)] [lam [] [[print s]] [[print {
 }]]]]]

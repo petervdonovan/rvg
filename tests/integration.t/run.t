@@ -5,13 +5,13 @@
   $ dune exec -- ../../bin/main.exe 1-multiple-files/a.rvg 1-multiple-files/b.rvg
       addi zero, zero, 0
   $ dune exec -- ../../bin/main.exe tokens 0.rvg
-  {"kind": "string", "modifier": "", "range": [[4, 7], [4, 9]] }
-  {"kind": "function", "modifier": "", "range": [[4, 5], [4, 6]] }
-  {"kind": "string", "modifier": "", "range": [[6, 13], [6, 15]] }
-  {"kind": "string", "modifier": "", "range": [[2, 7], [2, 9]] }
-  {"kind": "function", "modifier": "", "range": [[2, 5], [2, 6]] }
-  {"kind": "string", "modifier": "", "range": [[6, 13], [6, 15]] }
-  {"kind": "function", "modifier": "defaultLibrary", "range": [[0, 2], [0, 7]] }
+  {"kind": "string", "modifier": "", "range": { "file": "0.rvg", "range": [[4, 7], [4, 9]] } }
+  {"kind": "function", "modifier": "", "range": { "file": "0.rvg", "range": [[4, 5], [4, 6]] } }
+  {"kind": "string", "modifier": "", "range": { "file": "0.rvg", "range": [[6, 13], [6, 15]] } }
+  {"kind": "string", "modifier": "", "range": { "file": "0.rvg", "range": [[2, 7], [2, 9]] } }
+  {"kind": "function", "modifier": "", "range": { "file": "0.rvg", "range": [[2, 5], [2, 6]] } }
+  {"kind": "string", "modifier": "", "range": { "file": "0.rvg", "range": [[6, 13], [6, 15]] } }
+  {"kind": "function", "modifier": "defaultLibrary", "range": { "file": "0.rvg", "range": [[0, 2], [0, 7]] } }
   $ dune exec -- ../../bin/main.exe stdlib.rvg 2.rvg
   a ok
   b ok
@@ -97,3 +97,4 @@
       lw s2, 8(sp)
       lw s3, 12(sp)
       lw s4, 16(sp)
+  $ dune exec -- ../../bin/main.exe hover 3 10 15.rvg stdlib.rvg ctrl.rvg 15.rvg

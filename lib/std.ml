@@ -143,14 +143,16 @@ let isReg args _ _ _ currentEnv _ r  = (
   | _ -> falseLambda, meta')
 let unsafeAssertKCyclesFb k (f: Assembly.finished_block): Assembly.finished_block = (
   {content=f.content; provides=f.provides; totalCycles = Some k; cyclesMod=f.cyclesMod})
-let rec getCycles (f: Assembly.finished_block) = match f.totalCycles with
-  | Some k -> Some k
+let rec getCycles (f: Assembly.finished_block) =
+  let ({content; provides; totalCycles; cyclesMod}: Assembly.finished_block) = f in
+  let totalCycles' = (match totalCycles with
+  | Some k -> k
   | None -> (match f.content with
-    | Assembly.Instruction i -> HardwareTable.cyclesOf i
-    | Assembly.MetaBlock mb -> List.fold_left
-      (fun a b -> match a, b with | Some k, Some n -> Some (k + n) | _ -> None)
-      (Some 0)
-      (List.map getCycles mb))
+    | Assembly.Instruction i -> (match HardwareTable.cyclesOf i with
+      | Some k -> k
+      | None -> raise (AssertionFail "Failed to determine exact number of cycles"))
+    | Assembly.MetaBlock mb -> List.fold_left (+) 0 (List.map getCycles mb |> List.map snd)))
+  in ({content; provides; totalCycles=Some totalCycles'; cyclesMod}: Assembly.finished_block), totalCycles'
 let getFinishedBlock env asmexpr =
   let failure = (IllegalArgument ("Expected argument of type FinishedBlock but got " ^ (Ast.exprToString asmexpr))) in
   match asmexpr with
@@ -165,11 +167,18 @@ let exactCycles args _ _ _ currentEnv _ r =
   assertExactlyNArgs 1 args r;
   let asmexpr = args |> List.hd in
   let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) asmexpr in
-    match getCycles asmtem' with
-    | Some k -> Ast.ParsedAsm (
-        Assembly.Fragment (string_of_int k)),
-        metadata
-    | None -> raise (AssertionFail "Failed to determine exact number of cycles")
+    let _, k = getCycles asmtem' in
+      Ast.ParsedAsm (Assembly.Fragment (string_of_int k)), metadata
+let safeAssertKCycles args _ _ closure currentEnv _ r =
+  assertExactlyNArgs 1 args r;
+  let k, _ = args |> List.hd |> getNumericalArg in
+  emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
+  args' |> List.hd |> getFinishedBlock (Eval.expectAsm currentEnv)
+  |> fst |> getCycles |> (
+    fun (x, k') ->
+      if k = k' then Ast.ParsedAsm (Assembly.FinishedBlock x)
+      else raise (AssertionFail ("Expected " ^ (string_of_int k) ^ " cycles but got " ^ (string_of_int k')))),
+  args |> List.hd |> snd)
 let unsafeAssertKCycles args _ _ closure currentEnv _ r =
   assertExactlyNArgs 1 args r;
   emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
@@ -233,6 +242,7 @@ let stdFun: Ast.lam_function E.t = E.empty
   |> E.add "print" print
   |> E.add "fail" fail
   |> E.add "cycles?" exactCycles
+  |> E.add "cycles!" safeAssertKCycles
   |> E.add "unsafe-assert-exact-cycles" unsafeAssertKCycles
   |> E.add "addattr" addattr
   |> E.add "hasattr" hasattr
