@@ -1,0 +1,4 @@
+[[lam []
+[[print {hello:}]]
+[[print {HELLO:}]]
+]]

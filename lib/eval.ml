@@ -203,7 +203,7 @@ let%expect_test _ = printReducedAst testStd Environment.empty {|
   }
   |};
   [%expect{|
-    E(ParsedAsm(MetaBlock(MetaBlock(Label(START:)
+    E(ParsedAsm(MetaBlock(MetaBlock(Label(START true)
     Jal(jal, Ra, START)))), ) |}]
 
 let%expect_test _ = printEndingAsm {|
@@ -247,7 +247,7 @@ let%expect_test _ = printReducedAst testStd Environment.empty {|
     E(ParsedAsm(MetaBlock(MetaBlock(UType(lui, temp-t1, 0x40000)
     UType(auipc, temp-a0, 0x12345)
     MetaBlock(UType(lui, temp-t1, 524288)
-    IArith(addi, temp-t1, Zero, 1))
+    IArith(addi, temp-t1, temp-t1, 1))
     IArith(addi, temp-t0, temp-t1, 0)
     RType(sub, temp-t0, temp-t1, Zero)
     IArith(addi, Zero, Zero, 0)

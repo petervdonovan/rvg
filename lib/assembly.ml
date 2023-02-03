@@ -26,7 +26,7 @@ type instruction =
   | Jal of u_or_j_format
   | Jalr of i_format
   | UType of u_or_j_format
-  | Label of string
+  | Label of string * bool
 type fragment = string
 type nonce = string
 module Noncification = Map.Make(String)
@@ -55,7 +55,7 @@ let finishedBlockOf content = {
     Noncification.empty
     (List.map (fun c -> c.provides) mb)
   | Instruction instr -> (match instr with
-    | Label s -> Noncification.singleton s (nonce ())
+    | Label (s, noncify) -> Noncification.singleton s (if noncify then "_" ^ nonce () else "")
     | _ -> Noncification.empty
   ));
   totalCycles = None;
@@ -100,7 +100,7 @@ let instrToString instr =
     funNotation "Jalr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
   | UType { opc: opcode; rd: register; imm: immediate } ->
     funNotation "UType" ([fst opc] @ [regToString rd] @ [fst imm] )
-  | Label s -> "Label(" ^ s ^ ":" ^ ")"
+  | Label (s, noncify) -> "Label(" ^ s ^ " " ^ (string_of_bool noncify) ^ ")"
 let rec finishedBlockToString fb =
   match fb.content with
   | Instruction i -> instrToString i
@@ -216,9 +216,12 @@ let parseLi env opc s =
     let k = int_of_string ks in
     let upper = k / 4096 in
     let lower = k - 4096 * upper in
+    let lower = if lower > 2047 then lower - 4096 else lower in
+    let upper = (k - lower) / 4096 in
+    let rd = nameToReg env rd in
     Some (MetaBlock (
-      (if upper = 0 then [] else [finishedBlockOf (Instruction(UType {opc="lui", r; rd=nameToReg env rd; imm=string_of_int upper, immr}))])
-      @ (if lower = 0 && upper <> 0 then [] else [finishedBlockOf (Instruction(IArith {opc="addi", r; rd=nameToReg env rd; rs1 = Zero r; imm=string_of_int lower, immr}))]))))
+      (if upper = 0 then [] else [finishedBlockOf (Instruction(UType {opc="lui", r; rd; imm=string_of_int upper, immr}))])
+      @ (if lower = 0 && upper <> 0 then [] else [finishedBlockOf (Instruction(IArith {opc="addi", r; rd; rs1 = (if upper = 0 then Zero r else rd); imm=string_of_int lower, immr}))]))))
   | None -> None
 let parseMv env opc s =
   let _, r = opc in
@@ -290,7 +293,9 @@ let tryParse env str =
       else if opcode = "rdcycle" then parseRdcycle
       else if String.ends_with ~suffix:":" opcode
         then fun _ _ _ -> Some (Instruction(Label (
-          String.sub opcode 0 (String.length opcode - 1))))
+          String.sub opcode 0 (String.length opcode - 1),
+          String.capitalize_ascii opcode = opcode
+        )))
         else fun _ _ _ -> None
     ) env (opcode, r) s')
   | None -> None
@@ -378,7 +383,7 @@ and printFinishedBlock hn fb =
   | Instruction i -> print_string (stringifyInstruction hn' i)
   | MetaBlock mb -> List.iter (printFinishedBlock hn') mb
 and stringifyInstruction hierarchicalNoncifications i =
-  let noncify label = try label ^ "_" ^ Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications) with Not_found -> print_endline ("Could not find label " ^ label ^ " in the current context, and so could not print the label with the correct nonce"); raise Not_found in
+  let noncify label = try label ^ Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications) with Not_found -> print_endline ("Could not find label " ^ label ^ " in the current context, and so could not print the label with the correct nonce"); raise Not_found in
   let ($) s reg = s ^ (match reg with
     | TempReg (s, _) -> s
     | SaveReg (s, _) -> s
@@ -394,11 +399,11 @@ and stringifyInstruction hierarchicalNoncifications i =
   let (==) s imm = s ^ ", " ^ (imm |> fst |> noncify) in
   (match i with
   | RType { opc; rd; rs1; rs2 }   -> opc < rd $ rs1 $ rs2
-  | IArith { opc; rd; rs1; imm }  -> opc < rd $ rs1 = imm
+  | IArith { opc; rd; rs1; imm }  -> if String.equal (fst opc) "csrrw" then opc < rd = imm $ rs1 else opc < rd $ rs1 = imm
   | Load { opc; rd; rs1; imm }    -> opc < rd = imm $$ rs1
   | Store { opc; rs1; rs2; imm }  -> opc < rs2 = imm $$ rs1
   | Branch { opc; rs1; rs2; imm } -> opc < rs1 $ rs2 == imm
   | Jal { opc; rd; imm }          -> opc < rd == imm
   | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 == imm
-  | UType {opc; rd; imm}          -> opc < rd == imm
-  | Label s -> noncify s ^ ":") ^ "\n"
+  | UType {opc; rd; imm}          -> opc < rd = imm
+  | Label (s, _) -> noncify s ^ ":") ^ "\n"
