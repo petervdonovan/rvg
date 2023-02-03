@@ -38,10 +38,10 @@ let announceToken expr (r: CharStream.range) =
     if (Array.get Sys.argv 1 = "tokens") then print_endline ("{\"kind\": \"" ^ kind ^ "\", \"modifier\": \"" ^ modifier ^ "\", \"range\": " ^ rangeToJson r ^ " }")
   | None -> ()
 exception Unreachable
-let reportResolvedName range definition =
-  let content, ({ r=definitionRange; attrs }: Ast.metadata) = definition in
+let reportResolvedName range expr =
+  let content, ({ r=definitionRange; attrs }: Ast.metadata) = expr in
   match currentMode with
-  | Tokens -> announceToken definition range
+  | Tokens -> announceToken expr range
   | Definition p when CharStream.contains p range ->
     print_endline ("{\"range\": " ^ (definitionRange |> rangeToJson) ^ "}")
   | Hover p when CharStream.contains p range ->
