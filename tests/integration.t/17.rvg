@@ -1,7 +1,8 @@
 [stdlib [mu []
-[;; {|this is a long
-|[true {} {}]
+[;; {| this is a long
+|[true {} {}] long
 docstring.|}]
 [[print {hello:}]]
 [[print {HELLO:}]]
+[[print {| Hello: |}]]
 ]]

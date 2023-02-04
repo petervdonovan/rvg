@@ -133,10 +133,12 @@ and parseTemplateRec std marker stream = let asm, meta, s = parseAsm marker stre
   | Some _ -> raise (ParseFail ("This should be unreachable", (s: CharStream.t).current))
   | None -> raise (ParseFail ("Unexpected end-of-file before close of template", (s: CharStream.t).current))
 and parseTemplate std startInclusive stream: template * CharStream.range * CharStream.t =
-  let peek, s' = CharStream.peek stream in
-  let template, (s: CharStream.t) = parseTemplateRec std (
-    match peek with | Some '|' -> "|" | _ -> "") s' in
-  template, {startInclusive=startInclusive; endExclusive=s.current}, s
+  let marker, s' = (match CharStream.uncons stream with
+  | Some (c, s') -> if c = '|' then "|", s' else "", CharStream.cons c s'
+  | None -> "", stream)
+  in
+    let template, (s: CharStream.t) = parseTemplateRec std marker s' in
+    template, {startInclusive=startInclusive; endExclusive=s.current}, s
 and parseAsm marker stream =
   let pred = fun c -> not (List.mem c ['}';'[']) in
   let asm, r, s = CharStream.takeWhile pred stream in
