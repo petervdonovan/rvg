@@ -1,6 +1,6 @@
 [stdlib [mu []
 [;; {|this is a long
-long
+|[true {} {}]
 docstring.|}]
 [[print {hello:}]]
 [[print {HELLO:}]]

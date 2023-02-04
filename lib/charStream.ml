@@ -99,7 +99,7 @@ let fromFile f = let ic = open_in f in {
   previous=None;
   file=f
 }, ic
-let fromString p s = {s = String.to_seq s; current = p; previous = None; file = ""}
+let fromString f s = {s = String.to_seq s; current = origin f; previous = None; file = f}
 let charSeqToString s =
   let b = Buffer.create 16 in
     iter (Buffer.add_char b) s;

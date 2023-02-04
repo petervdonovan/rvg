@@ -224,7 +224,7 @@ let handleParseFail runnable = try runnable () with e -> match e with
 let testStd = Environment.empty
   |> Environment.add "lam" (fun _ _ _ _ _ _ _ -> Template [], metaEmpty)
   |> Environment.add "mu" (fun _ _ _ _ _ _ _ -> Template [], metaEmpty)
-let getAst testStd text = text |> (CharStream.fromString (CharStream.origin "")) |> parseTopLevel testStd
+let getAst testStd text = text |> (CharStream.fromString "") |> parseTopLevel testStd
 let printAst text: unit =
   text |> getAst testStd |> exprToString |> print_endline
 

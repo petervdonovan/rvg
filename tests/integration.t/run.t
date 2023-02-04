@@ -102,3 +102,4 @@
   $ dune exec -- ../../bin/main.exe stdlib.rvg 17.rvg
   hello:
   HELLO_tJ6slU7Skn:
+  $ dune exec -- ../../bin/main.exe stdlib.rvg "18.0.rvg=[mu[] [[lam [(x)] [;; {21}] [[print {[id x] [id x]}]]] {hello}]]" "18.1.rvg=[stdlib 18.0]"
