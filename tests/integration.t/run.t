@@ -99,6 +99,6 @@
       lw s4, 16(sp)
   $ dune exec -- ../../bin/main.exe hover 3 10 15.rvg stdlib.rvg ctrl.rvg 15.rvg
   {"attrs": [], "typeUnionOf": ["block"], "cycles": 6, "cyclesMod": [], "range": { "file": "15.rvg", "range": [[3, 8], [3, 12]] }}
-  $ dune exec -- ../../bin/main.exe 17.rvg
+  $ dune exec -- ../../bin/main.exe stdlib.rvg 17.rvg
   hello:
   HELLO_tJ6slU7Skn:

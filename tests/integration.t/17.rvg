@@ -1,4 +1,7 @@
-[[lam []
+[stdlib [mu []
+[;; {this is a long
+long
+docstring.}]
 [[print {hello:}]]
 [[print {HELLO:}]]
 ]]

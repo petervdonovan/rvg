@@ -261,7 +261,7 @@ let stdFun: Ast.lam_function E.t = E.empty
   |> E.add "<=!" (assertNumericalComparisonResult (<=) "less than or equal to")
   |> E.add ">!" (assertNumericalComparisonResult (>) "greater than")
   |> E.add ">=!" (assertNumericalComparisonResult (>=) "greater than or equal to")
-  |> E.add "fold_range" foldRange
+  |> E.add "fold-range" foldRange
   |> E.add "applierify-varargs" applierifyVarargs
 
 let std = E.map (fun f -> addattrInternal "std" (Ast.Lam {params=[]; lbody=[]; env=E.empty; f}, Ast.metaEmpty)) stdFun
