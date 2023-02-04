@@ -15,7 +15,7 @@
     DONE:
   }]
   [[unsafe-assert-exact-cycles {3}] assembly]]]
-[def (unroll) [lam [(n num!) (body block!)]
+[def (repeat) [lam [(n num!) (body block!)]
   [[unsafe-assert-exact-cycles [* n [cycles? body]]]
     [[[fold-range {1} {0} n] {}]
     [lam [(acc) (_)] {

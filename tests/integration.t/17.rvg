@@ -1,7 +1,7 @@
 [stdlib [mu []
-[;; {this is a long
+[;; {|this is a long
 long
-docstring.}]
+docstring.|}]
 [[print {hello:}]]
 [[print {HELLO:}]]
 ]]

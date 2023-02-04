@@ -122,28 +122,35 @@ and parseVar std startInclusive stream =
         ({ name = n; checks = checks }, metaInitial {startInclusive; endExclusive=s'.current}),
         s')
     | None -> raise (ParseFail ("Expected name, not end-of-file", (stream: CharStream.t).current))
-and parseTemplateRec std stream = let asm, meta, s = parseAsm stream in
-  if asm <> "" then let rest, s' = parseTemplateRec std s in
+and parseTemplateRec std marker stream = let asm, meta, s = parseAsm marker stream in
+  if asm <> "" then let rest, s' = parseTemplateRec std marker s in
     List.cons (Asm asm, meta) rest, s'
   else match CharStream.parseToken s with
   | Some ("}", s', _) -> [], s'
   | Some ("[", s', _) -> let e, s'' = parseList std s'.current s' in
-    let rest, s''' = parseTemplateRec std s'' in
+    let rest, s''' = parseTemplateRec std marker s'' in
       List.cons e rest, s'''
   | Some _ -> raise (ParseFail ("This should be unreachable", (s: CharStream.t).current))
   | None -> raise (ParseFail ("Unexpected end-of-file before close of template", (s: CharStream.t).current))
 and parseTemplate std startInclusive stream: template * CharStream.range * CharStream.t =
-  let template, (s: CharStream.t) = parseTemplateRec std stream in
+  let peek, s' = CharStream.peek stream in
+  let template, (s: CharStream.t) = parseTemplateRec std (
+    match peek with | Some '|' -> "|" | _ -> "") s' in
   template, {startInclusive=startInclusive; endExclusive=s.current}, s
-and parseAsm stream =
+and parseAsm marker stream =
   let pred = fun c -> not (List.mem c ['}';'[']) in
   let asm, r, s = CharStream.takeWhile pred stream in
-    (List.fold_left (fun s c -> (String.make 1 c) ^ s) "" asm),
-    metaInitial r,
-    s
+  let b = Buffer.create 16 in
+  asm |> List.rev |> List.iter (Buffer.add_char b);
+  let contents = Buffer.contents b in
+  if String.ends_with ~suffix:marker contents || contents = "" then contents, metaInitial r, s
+  else match CharStream.uncons s with
+  | Some (c, s') -> let rest, r', s'' = parseAsm marker s' in
+    contents ^ (String.make 1 c) ^ rest, metaInitial {startInclusive=r.startInclusive; endExclusive=r'.r.endExclusive}, s''
+  | None -> contents, metaInitial r, s
 and parseExpr std t s (r: CharStream.range) =
   if t = "[" then parseList std r.startInclusive s
-  else if t = "{" then let (template, r', s) = parseTemplate std r.startInclusive s in
+  else if String.starts_with ~prefix:"{" t then let (template, r', s) = parseTemplate std r.startInclusive s in
   (Template template, metaInitial r'), s
   else (Name t, metaInitial r), s
 and parseExprs std acc stream =
@@ -180,7 +187,7 @@ and parseArgs std stream accumulator =
   | Some (t, s, r) ->
     let nextExpr, s' =
       if t = "[" then parseList std r.startInclusive s
-      else if t = "{" then let tem, r, ss' = parseTemplate std r.startInclusive s in (Template tem, metaInitial r), ss'
+      else if String.starts_with ~prefix:"{" t then let tem, r, ss' = parseTemplate std r.startInclusive s in (Template tem, metaInitial r), ss'
       else (Name t, metaInitial r), s
     in parseArgs std s' (nextExpr :: accumulator)
   | None -> raise (ParseFail ("Expected arg or ']', not end-of-file", (stream: CharStream.t).current))

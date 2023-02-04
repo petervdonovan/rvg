@@ -52,7 +52,7 @@ let cons c (sp: t) =
   | Some pos -> let s' = Seq.cons c s in {s=s'; current=pos; previous=None; file}
   | None -> raise (StreamException "Multiple consecutive cons to stream")
 let iter f spp = let {s; _} = spp in Seq.iter f s
-
+let peek s = match uncons s with | Some (c, s') -> Some (c), cons c s' | None -> None, s
 let rec takeWhileRec pred acc r s =
   match unconsp s with
   | Some (c, s', p) -> if pred c
