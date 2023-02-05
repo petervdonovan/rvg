@@ -35,4 +35,6 @@ let () =
       "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s)
     | Rvg.Eval.EvalFail (s, r) -> printMessageRange s r
     | Rvg.Std.AssertionFail (s, r) -> printMessageRange s r
+    | Rvg.Std.IllegalArgument (s, r) -> printMessageRange s r
+    | Rvg.Std.WrongNumberOfArgs (s, r) -> printMessageRange s r
     | _ -> raise e)

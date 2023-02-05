@@ -22,7 +22,7 @@ let getNumericalArg r arg =
   | Some (n, meta) -> (match int_of_string_opt n with
     | None -> raise (IllegalArgument ("\"" ^ n ^ "\" is not a number", r))
     | Some k -> k, meta)
-  | _ -> raise (IllegalArgument ("Expected numerical arg, but got expression of the wrong type", ((snd arg): Ast.metadata).r))
+  | _ -> raise (IllegalArgument ("Expected numerical arg, but got expression \"" ^ (Ast.exprToString arg) ^ "\"of the wrong type", r))
 let errorReportingPrintExpr e =
   print_endline ((match getStringArgOpt e with
   | Some (s, _) -> s
@@ -195,6 +195,7 @@ let plus = binaryMathOp (+)
 let minus = binaryMathOp (-)
 let times = binaryMathOp ( * )
 let dividedBy = binaryMathOp (/)
+let modulo = binaryMathOp (mod)
 let assertNumericalComparisonResult comparator description args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r;
   let arg0, _ = args |> List.hd |> getNumericalArg r in
@@ -256,6 +257,7 @@ let stdFun: Ast.lam_function E.t = E.empty
   |> E.add "*" times
   |> E.add "-" minus
   |> E.add "/" dividedBy
+  |> E.add "%" modulo
   |> E.add "=!" (assertNumericalComparisonResult (=) "exactly")
   |> E.add "<!" (assertNumericalComparisonResult (<) "less than")
   |> E.add "<=!" (assertNumericalComparisonResult (<=) "less than or equal to")
@@ -287,9 +289,9 @@ let%expect_test _ = (try
     | AssertionFail (s, r) -> print_endline s; print_endline (CharStream.rangeToString r)
     | Eval.EvalFail (s, _) -> print_endline s);
   [%expect{|
-    help: line 4, col 18 to line 4, col 24
+    help: [] line 4, col 18 to line 4, col 24
     Assertion failed
-    line 1, col 3 to line 4, col 28 |}]
+    [] line 1, col 3 to line 4, col 28 |}]
 
 let%expect_test _ = (try Eval.printReducedAst stdFun std {|
     [cycles?

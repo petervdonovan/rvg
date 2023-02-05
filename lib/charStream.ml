@@ -12,7 +12,7 @@ type range = {
   endExclusive: position;
 }
 let posToString p = "line " ^ (string_of_int p.zeroBasedLine) ^ ", col " ^ (string_of_int p.zeroBasedCol)
-let rangeToString r = posToString r.startInclusive ^ " to " ^ (posToString r.endExclusive)
+let rangeToString r = "[" ^ r.startInclusive.file ^ "] " ^ posToString r.startInclusive ^ " to " ^ (posToString r.endExclusive)
 let origin file = {zeroBasedLine = 0; zeroBasedCol = 0; file}
 let incrementedCol p =
   {zeroBasedLine = p.zeroBasedLine; zeroBasedCol = p.zeroBasedCol+1; file = p.file}

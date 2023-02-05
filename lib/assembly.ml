@@ -383,7 +383,9 @@ and printFinishedBlock hn fb =
   | Instruction i -> print_string (stringifyInstruction hn' i)
   | MetaBlock mb -> List.iter (printFinishedBlock hn') mb
 and stringifyInstruction hierarchicalNoncifications i =
-  let noncify label = try label ^ Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications) with Not_found -> print_endline ("Could not find label " ^ label ^ " in the current context, and so could not print the label with the correct nonce"); raise Not_found in
+  let noncify label = try
+      label ^ Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications)
+    with Not_found -> print_endline ("Could not find label " ^ label ^ " in the current context, and so could not print the label with the correct nonce"); raise Not_found in
   let ($) s reg = s ^ (match reg with
     | TempReg (s, _) -> s
     | SaveReg (s, _) -> s

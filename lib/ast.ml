@@ -145,8 +145,8 @@ and parseAsm marker stream =
   let b = Buffer.create 16 in
   asm |> List.rev |> List.iter (Buffer.add_char b);
   let contents = Buffer.contents b in
-  if String.ends_with ~suffix:marker contents || contents = "" then contents, metaInitial r, s
-  else match CharStream.uncons s with
+  if contents = "" then contents, metaInitial r, s else if String.ends_with ~suffix:marker contents then (String.sub contents 0 ((String.length contents) - (String.length marker)), metaInitial r, s) else
+  match CharStream.uncons s with
   | Some (c, s') -> let rest, r', s'' = parseAsm marker s' in
     contents ^ (String.make 1 c) ^ rest, metaInitial {startInclusive=r.startInclusive; endExclusive=r'.r.endExclusive}, s''
   | None -> contents, metaInitial r, s
