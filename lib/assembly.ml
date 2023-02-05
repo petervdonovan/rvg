@@ -170,8 +170,8 @@ let parseJal env opc s =
   | None -> None
 let parseJalr env opc s =
   match get3Tokens s with
-  | Some (rd, rs1, label, _) -> Some (Instruction(Jalr {
-    opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; imm = resolveLabel env label
+  | Some (rd, rs1, imm, _) -> Some (Instruction(Jalr {
+    opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; imm = resolveNumericalImm env imm
   }))
   | None -> None
 let parseU env opc s =
@@ -385,7 +385,7 @@ and printFinishedBlock hn fb =
 and stringifyInstruction hierarchicalNoncifications i =
   let noncify label = try
       label ^ Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications)
-    with Not_found -> print_endline ("Could not find label " ^ label ^ " in the current context, and so could not print the label with the correct nonce"); raise Not_found in
+    with Not_found -> raise (AsmParseFail ("Could not find label " ^ label ^ " in the current context, and so could not print the label with the correct nonce")) in
   let ($) s reg = s ^ (match reg with
     | TempReg (s, _) -> s
     | SaveReg (s, _) -> s
@@ -406,6 +406,6 @@ and stringifyInstruction hierarchicalNoncifications i =
   | Store { opc; rs1; rs2; imm }  -> opc < rs2 = imm $$ rs1
   | Branch { opc; rs1; rs2; imm } -> opc < rs1 $ rs2 == imm
   | Jal { opc; rd; imm }          -> opc < rd == imm
-  | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 == imm
+  | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 = imm
   | UType {opc; rd; imm}          -> opc < rd = imm
   | Label (s, _) -> noncify s ^ ":") ^ "\n"

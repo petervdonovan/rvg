@@ -92,7 +92,7 @@ let%expect_test _ =
   beq a5 t3 END
   jal ra END3
 
-  jalr zero t4 END2
+  jalr zero ra 0
   |};
   [%expect{|
     MetaBlock(RType(add, temp-t0, temp-t1, temp-t2)
@@ -100,7 +100,7 @@ let%expect_test _ =
     Load(lbu, save-s4, temp-t6, 12)
     Branch(beq, temp-a5, temp-t3, END)
     Jal(jal, Ra, END3)
-    Jalr(jalr, Zero, temp-t4, END2)) |}]
+    Jalr(jalr, Zero, Ra, 0)) |}]
 
 let printReducedAst stdFun std text =
   text |> Ast.getAst stdFun |> evalExpr std |> fst |> Ast.exprToString

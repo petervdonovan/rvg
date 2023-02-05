@@ -105,3 +105,11 @@
   Hello_vWRvZ2Pn4y:
   $ dune exec -- ../../bin/main.exe stdlib.rvg "18.0.rvg=[mu[] [[lam [(x)] [;; {21}] [[print {[id x] [id x]}]]] {hello}]]" "18.1.rvg=[stdlib 18.0]"
   hello hello
+  $ dune exec -- ../../bin/main.exe stdlib.rvg ctrl.rvg 19.rvg
+  hello:
+  start:
+      lui t0, 764588
+      addi t0, t0, -1366
+      csrrw zero, 0x51e, t0
+      csrrw zero, 0x51e, a0
+      jalr zero, ra, 0
