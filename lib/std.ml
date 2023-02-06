@@ -95,14 +95,14 @@ let isLam args _ _ closure _ _ r = (
 let lamOf paramChecks _ _ closure _ _ r = (
   List.iter (fun e -> match e with
     | Ast.Lam _, _ -> ()
-    | _ -> raise (AssertionFail ("Expected lam ", r))) paramChecks;
+    | _ -> raise (AssertionFail ("Expected lam but got " ^ (Ast.exprToString e), r))) paramChecks;
   emptyLam 1 r closure (fun args _ _ _ _ _ r ->
     let checkee = List.hd args in
     match checkee with
     | Lam (l: Ast.lam), meta -> (
       let nParams = List.length paramChecks in
       (let actualNParams = List.length l.params in
-      (if actualNParams <> nParams then raise (AssertionFail ("Expected " ^ (string_of_int nParams) ^ " params, not " ^ (string_of_int actualNParams) ^ " ", r))));
+      (if actualNParams <> nParams && not (hasNargsAttr nParams (snd checkee)) then raise (AssertionFail ("Expected " ^ (string_of_int nParams) ^ " params, not " ^ (string_of_int actualNParams) ^ " ", (snd checkee).r))));
       let ({params; lbody; env; f}: Ast.lam) = l in
       let instrumented = Ast.Lam {params; lbody; env; f=fun args params lbody closure' currentEnv evalSequence r -> (
           (if List.length args <> nParams then raise (AssertionFail ("Wrong number of args: ", r)));
@@ -112,7 +112,7 @@ let lamOf paramChecks _ _ closure _ _ r = (
           in f args' params lbody closure' currentEnv evalSequence r
         )}
       in instrumented, ({attrs=Ast.Attributes.add (nargsAttr nParams) meta.attrs; r=meta.r}: Ast.metadata))
-    | _ -> raise (AssertionFail ("Expected lam ", r))
+    | _ -> raise (AssertionFail ("Expected lam but got " ^ (Ast.exprToString checkee), r))
   )
 )
 let isX predicate args _ _ _ _ _ r  = (

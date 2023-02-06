@@ -17,7 +17,8 @@ let rec evalExpr env e = match e with
       meta
     ), env
   | Ast.Template tem, meta ->
-    let exprs', env' = evalExprListInOrder env tem in
+    let exprs', env' = evalExprListInOrder env (List.rev tem) in
+    let exprs' = List.rev exprs' in (* FIXME: inefficient to double rev? *)
     let tem = (Ast.Template exprs', meta) in
     let pasm, meta = Ast.exprToParsedAsm (expectAsm meta.r env') tem in
     (ParsedAsm pasm, meta), env'
@@ -218,10 +219,10 @@ let%expect_test _ = printEndingAsm {|
   }
   |};
   [%expect {|
-    START_5TsUpEQjDf:
     START_Kd4gRhlUDG:
-        bne t0, t1, START_Kd4gRhlUDG
-        jal gp, START_5TsUpEQjDf |}]
+    START_5TsUpEQjDf:
+        bne t0, t1, START_5TsUpEQjDf
+        jal gp, START_Kd4gRhlUDG |}]
 
 let%expect_test _ = printReducedAst testStd Environment.empty {|
   [[lam [(x [lam [(la)] [la]])] x]
