@@ -138,7 +138,7 @@ let isReg args _ _ _ currentEnv _ r  = (
   let arg, meta' = List.hd args in
   match arg with
   | Ast.ParsedAsm Assembly.Fragment s ->
-    (try ignore(Assembly.nameToReg (Eval.expectAsm currentEnv) (s, meta'.r)); trueLambda, meta'
+    (try ignore(Assembly.nameToReg (Eval.expectAsm meta'.r currentEnv) (s, meta'.r)); trueLambda, meta'
     with _ -> falseLambda, meta')
   | _ -> falseLambda, meta')
 let unsafeAssertKCyclesFb k (f: Assembly.finished_block): Assembly.finished_block = (
@@ -166,14 +166,14 @@ let getFinishedBlock env r asmexpr =
 let exactCycles args _ _ _ currentEnv _ r =
   assertExactlyNArgs 1 args r;
   let asmexpr = args |> List.hd in
-  let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) r asmexpr in
+  let asmtem', metadata = getFinishedBlock (Eval.expectAsm r currentEnv) r asmexpr in
     let _, k = getCycles r asmtem' in
       Ast.ParsedAsm (Assembly.Fragment (string_of_int k)), metadata
 let safeAssertKCycles args _ _ closure currentEnv _ r =
   assertExactlyNArgs 1 args r;
   let k, _ = args |> List.hd |> getNumericalArg r in
   emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
-  args' |> List.hd |> getFinishedBlock (Eval.expectAsm currentEnv) r
+  args' |> List.hd |> getFinishedBlock (Eval.expectAsm r currentEnv) r
   |> fst |> getCycles r |> (
     fun (x, k') ->
       if k = k' then Ast.ParsedAsm (Assembly.FinishedBlock x)
@@ -184,7 +184,7 @@ let unsafeAssertKCycles args _ _ closure currentEnv _ r =
   emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
     let k, _ = args |> List.hd |> getNumericalArg r in
     let asmexpr = args' |> List.hd in
-    let asmtem', metadata = getFinishedBlock (Eval.expectAsm currentEnv) r asmexpr in
+    let asmtem', metadata = getFinishedBlock (Eval.expectAsm r currentEnv) r asmexpr in
       Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')), metadata)
 let binaryMathOp op args _ _ _ _ _ r =
   assertExactlyNArgs 2 args r;

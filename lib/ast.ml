@@ -202,7 +202,7 @@ and parseVarList std startInclusive accumulator stream =
   | Some (x, _, p) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x, p))
   | None -> raise (ParseFail ("Expected ']' or '(', not end-of-file", (stream: CharStream.t).current))
 let thisIsUnevaluatedOrNotAssembly description e =
-  raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly"))
+  raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly", (snd e).r))
 let rec exprToParsedAsm env e =
   let content, meta = e in
   match content with

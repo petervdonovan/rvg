@@ -13,26 +13,26 @@ let rec evalExpr env e = match e with
     ^ (Ast.exprToString e), Ast.rangeOf e))
   | Ast.ParsedAsm _, _ -> e, env
   | Ast.Asm asm, meta -> (Ast.ParsedAsm
-      (Assembly.parse Assembly.empty (expectAsm env) asm),
+      (Assembly.parse Assembly.empty (expectAsm meta.r env) asm),
       meta
     ), env
   | Ast.Template tem, meta ->
     let exprs', env' = evalExprListInOrder env tem in
     let tem = (Ast.Template exprs', meta) in
-    let pasm, meta = Ast.exprToParsedAsm (expectAsm env') tem in
+    let pasm, meta = Ast.exprToParsedAsm (expectAsm meta.r env') tem in
     (ParsedAsm pasm, meta), env'
   | Ast.Lam {params; lbody; env = prevEnv; f }, meta -> (
     if Environment.is_empty prevEnv
       then (Ast.Lam { params; lbody; env; f }, meta), env
       else e, env)
-  | Ast.LamApplication { lam; args }, _ -> (
+  | Ast.LamApplication { lam; args }, meta -> (
     let args', env' = evalExprListInOrder env args in (
     let lam', _ = evalExpr env' lam in
     match lam' with
     | Lam { params; lbody; env = env''; f }, _ ->
-      f args' params lbody env'' env' evalSequence (Ast.rangeOf e), env'
+      f args' params lbody env'' env' (evalSequence meta.r) meta.r, env'
     | e -> raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e, Ast.rangeOf e))))
-  | Ast.Def define, _ -> (let evaluated = evalSequence env define.dvalue in
+  | Ast.Def define, meta -> (let evaluated = (evalSequence meta.r) env define.dvalue in
     evaluated, bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
 and evalExprListInOrder env exprList =
   let exprs, env = List.fold_left
@@ -41,20 +41,21 @@ and evalExprListInOrder env exprList =
         expr' :: exprs, env'
     ) ([], env) (List.rev exprList)
   in exprs, env
-and evalSequence env exprList =
+and evalSequence r env exprList =
+  if List.length exprList == 0 then raise (EvalFail ("Expected sequence, but got nothing", r)) else
   let exprs', _ = evalExprListInOrder env exprList in
   let head = List.hd exprs' in
   head
-and expectAsm env name description =
+and expectAsm r env name description =
 (if Environment.mem name env
   then match evalExpr env (Environment.find name env) with
   | (Ast.Asm num, meta), _ -> num, meta.r
-  | (Ast.ParsedAsm pasm, meta), _ -> (match pasm with
-    | Fragment f -> f, meta.r
-    | _ -> raise (Assembly.AsmParseFail ("Expected assembly fragment, but got assembly block")))
+  | (Ast.ParsedAsm pasm, _), _ -> (match pasm with
+    | Fragment f -> f, r
+    | _ -> raise (Assembly.AsmParseFail ("Expected assembly fragment, but got assembly block", r)))
   | bad, _ -> raise (Assembly.AsmParseFail (
-    description ^ " expected, but found expression " ^ Ast.exprToString bad))
-  else Assembly.failWithNoBinding name)
+    description ^ " expected, but found expression " ^ Ast.exprToString bad, (snd bad).r))
+  else Assembly.failWithNoBinding name r)
 and bindNames env params args r =
   let nparams = List.length params in
   let nargs = List.length args in
@@ -81,7 +82,7 @@ let testStd = Environment.empty
   |> Environment.add "mu" mu
 
 
-let printAsm str = str |> Assembly.parse Assembly.empty (expectAsm Environment.empty)
+let printAsm str = str |> Assembly.parse Assembly.empty (expectAsm Assembly.todo Environment.empty)
   |> Assembly.asmToString |> print_endline
 
 let%expect_test _ =
@@ -117,7 +118,7 @@ let%expect_test _ = printReducedAst testStd Environment.empty "[[lam [] {}]]";
 let%expect_test _ = printReducedAst testStd Environment.empty "[[lam [(x)] {}] {} ]";
   [%expect{| E(ParsedAsm(Fragment()), ) |}]
 
-let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (fst (Ast.exprToParsedAsm (expectAsm Environment.empty) (Ast.Asm " 12 ", Ast.metaEmpty))), Ast.metaEmpty));
+let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (fst (Ast.exprToParsedAsm (expectAsm Assembly.todo Environment.empty) (Ast.Asm " 12 ", Ast.metaEmpty))), Ast.metaEmpty));
   [%expect {| E(ParsedAsm(Fragment( 12 )), ) |}]
 
 let%expect_test _ = Ast.printAst {|

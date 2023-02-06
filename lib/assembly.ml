@@ -1,4 +1,4 @@
-exception AsmParseFail of string
+exception AsmParseFail of string * CharStream.range
 
 open ParseUtil
 open CharStream
@@ -45,6 +45,7 @@ type t =
   | Fragment of fragment
   | Block of block
   | FinishedBlock of finished_block
+let todo = ({startInclusive=CharStream.origin "TODO"; endExclusive=CharStream.origin "TODO"}: CharStream.range)
 let isEmpty fragment = fragment = ""
 let empty = Fragment ""
 let finishedBlockOf content = {
@@ -73,7 +74,7 @@ let jalInstrs = strsToNameset ["jal"]
 let jalrInstrs = strsToNameset ["jalr"]
 let temporaries = strsToNameset ["t0"; "t1"; "t2"; "t3"; "t4"; "t5"; "t6"; "a0"; "a1"; "a2"; "a3"; "a4"; "a5"; "a6"; "a7"]
 let saved = strsToNameset ["s0"; "s1"; "s2"; "s3"; "s4"; "s5"; "s6"; "s7"; "s8"; "s9"; "s10"; "s11"]
-let failWithNoBinding name = raise (AsmParseFail ("Could not find binding for name \"" ^ name ^ "\""))
+let failWithNoBinding name r = raise (AsmParseFail ("Could not find binding for name \"" ^ name ^ "\"", r))
 let regToString reg = match reg with
   | TempReg (name, _) -> "temp-" ^ name
   | SaveReg (name, _) -> "save-" ^ name
@@ -130,8 +131,8 @@ let resolveNumericalImm env imm =
 let resolveLabel env (label: string * range) =
   let l, _ = label in
   try env l "Label" with AsmParseFail _ -> label
-let asmParseFail formatDescription s =
-  raise (AsmParseFail ("Instruction \"" ^ (charSeqToString s) ^ "\" does not follow the instruction syntax for " ^ formatDescription))
+let asmParseFail formatDescription s r =
+  raise (AsmParseFail ("Instruction \"" ^ (charSeqToString s) ^ "\" does not follow the instruction syntax for " ^ formatDescription, r))
 let parseR env opc s =
   match get3Tokens s with
   | Some (rd, rs1, rs2, _) -> Some (Instruction(RType { opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2 }))
@@ -207,7 +208,7 @@ let parseJr env opc s =
     imm = "0", r
   }))
   | None -> None
-let parseLa _ _ _ = raise (AsmParseFail "la is not currently supported")
+let parseLa _ opc _ = raise (AsmParseFail ("la is not currently supported", snd opc))
 let parseLi env opc s =
   let _, r = opc in
   match get2Tokens s with
@@ -326,7 +327,7 @@ let prependBlock env acc prependable =
   let glueFail = (AsmParseFail (
     "\"" ^ (asmToString prependable) ^ "\" and \""
     ^ (asmToString (Block acc))
-    ^ " cannot be glued together."
+    ^ " cannot be glued together.", ({startInclusive=CharStream.origin "TODO"; endExclusive=CharStream.origin "TODO"}: CharStream.range)
   )) in
   match prependable with
   | Fragment s -> {top = s ^ acc.top; middle = acc.middle; bottom = acc.bottom}
@@ -383,9 +384,9 @@ and printFinishedBlock hn fb =
   | Instruction i -> print_string (stringifyInstruction hn' i)
   | MetaBlock mb -> List.iter (printFinishedBlock hn') mb
 and stringifyInstruction hierarchicalNoncifications i =
-  let noncify label = try
+  let noncify r label = try
       label ^ Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications)
-    with Not_found -> raise (AsmParseFail ("Could not find label " ^ label ^ " in the current context, and so could not print the label with the correct nonce")) in
+    with Not_found -> raise (AsmParseFail ("Could not find label " ^ label ^ " in the current context, and so could not print the label with the correct nonce", r)) in
   let ($) s reg = s ^ (match reg with
     | TempReg (s, _) -> s
     | SaveReg (s, _) -> s
@@ -398,7 +399,7 @@ and stringifyInstruction hierarchicalNoncifications i =
   let (<) opc t = "    " ^ (fst opc) ^ " " $ t in
   let ($) s reg = (s ^ ", ") $ reg in
   let (=) s imm = s ^ ", " ^ (fst imm) in
-  let (==) s imm = s ^ ", " ^ (imm |> fst |> noncify) in
+  let (==) s imm = s ^ ", " ^ (imm |> fst |> noncify (snd imm)) in
   (match i with
   | RType { opc; rd; rs1; rs2 }   -> opc < rd $ rs1 $ rs2
   | IArith { opc; rd; rs1; imm }  -> if String.equal (fst opc) "csrrw" then opc < rd = imm $ rs1 else opc < rd $ rs1 = imm
@@ -408,4 +409,4 @@ and stringifyInstruction hierarchicalNoncifications i =
   | Jal { opc; rd; imm }          -> opc < rd == imm
   | Jalr { opc; rd; rs1; imm }    -> opc < rd $ rs1 = imm
   | UType {opc; rd; imm}          -> opc < rd = imm
-  | Label (s, _) -> noncify s ^ ":") ^ "\n"
+  | Label (s, _) -> (noncify ({startInclusive=CharStream.origin "TODO"; endExclusive=CharStream.origin "TODO"}: CharStream.range) s) ^ ":") ^ "\n"
