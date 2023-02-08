@@ -183,7 +183,7 @@ let parseBxxz env opc s = (
   let opcs, r = opc in
   match get2Tokens s with
   | Some (rs1, label, _) -> Some (Instruction(Branch {
-      opc = if opcs = "beqz" then "beq", r else "bnez", r;
+      opc = if opcs = "beqz" then "beq", r else "bne", r;
       rs1 = nameToReg env rs1;
       rs2=Zero r;
       imm=resolveLabel env label
