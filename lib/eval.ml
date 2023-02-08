@@ -77,7 +77,7 @@ let lam args params lbody closure _ evalSequence r =
     evalSequence bound lbody
 let mu args params lbody closure currentEnv evalSequence r =
   let bound = bindNames currentEnv (List.map fst params) args r in
-    evalSequence (Environment.union (fun _ _ b -> Some b) bound closure) lbody
+    evalSequence (Environment.union (fun _ a _-> Some a) bound closure) lbody
 let testStd = Environment.empty
   |> Environment.add "lam" lam
   |> Environment.add "mu" mu
@@ -184,7 +184,7 @@ let%expect_test _ = printReducedAst testStd Environment.empty {|
       [def (m) [[lam [(x)] [mu [] {lw x 0(a0)}]] {a0}]]
       [m]]]
   |};
-  [%expect{| E(ParsedAsm(MetaBlock(Load(lw, temp-a0, temp-a0, 0))), ) |}]
+  [%expect{| E(ParsedAsm(MetaBlock(Load(lw, temp-t0, temp-a0, 0))), ) |}]
 
 
 let%expect_test _ = printReducedAst testStd Environment.empty {|
