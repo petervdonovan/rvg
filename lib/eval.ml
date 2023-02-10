@@ -241,7 +241,7 @@ let%expect_test _ = printReducedAst testStd Environment.empty {|
     not t0 t1
     ret
     csrw 0x51e s6
-    csrrw t0 sp 0x51e
+    csrrw t0 0x51e sp
     rdcycle s0
   }
 |};
@@ -255,6 +255,6 @@ let%expect_test _ = printReducedAst testStd Environment.empty {|
     IArith(addi, Zero, Zero, 0)
     IArith(xori, temp-t0, temp-t1, -1)
     Jalr(jalr, Zero, Ra, 0)
-    IArith(csrrw, Zero, save-s6, 0x51e)
-    IArith(csrrw, temp-t0, Sp, 0x51e)
-    IArith(csrrs, save-s0, Zero, 0xb00)))), ) |}]
+    Csr(csrrw, Zero, save-s6, 0x51e)
+    Csr(csrrw, temp-t0, Sp, 0x51e)
+    Csr(csrrs, save-s0, Zero, 0xb00)))), ) |}]

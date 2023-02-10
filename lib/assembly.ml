@@ -257,6 +257,13 @@ let parseRet _ opc _ =
   let _, r = opc in Some(Instruction(Jalr({
     opc="jalr", r; rd=Zero r; rs1=Ra r; imm="0", r
   })))
+let parseCsrInstr env opc s =
+  let opc, r = opc in
+  match get3Tokens s with
+  | None -> None
+  | Some (rd, csr, rs1, _) -> Some(Instruction(Csr({
+    opc=opc, r; rd=nameToReg env rd; rs1=nameToReg env rs1; imm=resolveNumericalImm env csr
+  })))
 let parseCsrw env opc s =
   let _, r = opc in
   match get2Tokens s with
@@ -290,6 +297,7 @@ let tryParse env str =
       else if pred branchInstrs then parseBranch
       else if pred jalInstrs then parseJal
       else if pred jalrInstrs then parseJalr
+      else if pred csrInstrs then parseCsrInstr
       else if pred (strsToNameset ["auipc"; "lui"]) then parseU
       else if opcode = "beqz" || opcode = "bnez" then parseBxxz
       else if opcode = "j" then parseJ

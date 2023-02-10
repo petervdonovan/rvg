@@ -292,9 +292,9 @@ let%expect_test _ = (try
     | AssertionFail (s, r) -> print_endline s; print_endline (CharStream.rangeToString r)
     | Eval.EvalFail (s, _) -> print_endline s);
   [%expect{|
-    help: [] line 4, col 18 to line 4, col 24
+    help: [] line 5, col 19 to line 5, col 25
     Assertion failed
-    [] line 1, col 3 to line 4, col 28 |}]
+    [] line 2, col 4 to line 5, col 29 |}]
 
 let%expect_test _ = (try Eval.printReducedAst stdFun std {|
     [cycles?
