@@ -20,6 +20,7 @@ type u_or_j_format = { opc: opcode; rd: register; imm: immediate }
 type instruction =
   | RType of r_format
   | IArith of i_format
+  | Csr of i_format
   | Load of i_format
   | Store of s_or_b_format
   | Branch of s_or_b_format
@@ -66,7 +67,8 @@ let finishedBlockOf content = {
 module NameSet = Set.Make(String)
 let strsToNameset strs = List.fold_right NameSet.add strs NameSet.empty
 let rTypeInstrs: NameSet.t = strsToNameset ["add"; "sub"; "and"; "or"; "xor"; "sll"; "srl"; "sra"; "slt"; "sltu"]
-let iTypeInstrs = strsToNameset ["addi"; "andi"; "ori"; "xori"; "slli"; "srli"; "srai"; "slti"; "sltiu"; "csrrw"; "csrrs"; "csrrc"; "csrrwi"; "csrrsi"; "csrrci"]
+let iTypeInstrs = strsToNameset ["addi"; "andi"; "ori"; "xori"; "slli"; "srli"; "srai"; "slti"; "sltiu"]
+let csrInstrs = strsToNameset ["csrrw"; "csrrs"; "csrrc"; "csrrwi"; "csrrsi"; "csrrci"]
 let loadInstrs = strsToNameset ["lb"; "lbu"; "lh"; "lhu"; "lw"]
 let storeInstrs = strsToNameset ["sb"; "sh"; "sw"]
 let branchInstrs = strsToNameset ["beq"; "bge"; "bgeu"; "blt"; "bltu"; "bne"]
@@ -89,6 +91,8 @@ let instrToString instr =
     funNotation "RType" ([fst opc] @ List.map regToString [rd;rs1;rs2])
   | IArith { opc: opcode; rd: register; rs1: register; imm: immediate } ->
     funNotation "IArith" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
+  | Csr { opc: opcode; rd: register; rs1: register; imm: immediate } ->
+    funNotation "Csr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
   | Load { opc: opcode; rd: register; rs1: register; imm: immediate } ->
     funNotation "Load" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
   | Store { opc: opcode; rs1: register; rs2: register; imm: immediate } ->
@@ -257,14 +261,21 @@ let parseCsrw env opc s =
   let _, r = opc in
   match get2Tokens s with
   | None -> None
-  | Some (csr, source, _) -> Some(Instruction(IArith({
+  | Some (csr, source, _) -> Some(Instruction(Csr({
     opc="csrrw", r; rd=Zero r; rs1=nameToReg env source; imm=resolveNumericalImm env csr
+  })))
+let parseCsrr env opc s =
+  let _, r = opc in
+  match get2Tokens s with
+  | None -> None
+  | Some (dest, csr, _) -> Some(Instruction(Csr({
+    opc="csrrs", r; rd=nameToReg env dest; rs1=Zero r; imm=resolveNumericalImm env csr
   })))
 let parseRdcycle env opc s =
   let _, r = opc in
   match parseToken s with
   | None -> None
-  | Some (rd, _, r') -> Some(Instruction(IArith({
+  | Some (rd, _, r') -> Some(Instruction(Csr({
     opc="csrrs", r'; rd=nameToReg env (rd, r'); rs1=Zero r; imm="0xb00", r
   })))
 let tryParse env str =
@@ -291,6 +302,7 @@ let tryParse env str =
       else if opcode = "not" then parseNot
       else if opcode = "ret" then parseRet
       else if opcode = "csrw" then parseCsrw
+      else if opcode = "csrr" then parseCsrr
       else if opcode = "rdcycle" then parseRdcycle
       else if String.ends_with ~suffix:":" opcode
         then fun _ _ _ -> Some (Instruction(Label (
@@ -402,7 +414,8 @@ and stringifyInstruction hierarchicalNoncifications i =
   let (==) s imm = s ^ ", " ^ (imm |> fst |> noncify (snd imm)) in
   (match i with
   | RType { opc; rd; rs1; rs2 }   -> opc < rd $ rs1 $ rs2
-  | IArith { opc; rd; rs1; imm }  -> if String.equal (fst opc) "csrrw" then opc < rd = imm $ rs1 else opc < rd $ rs1 = imm
+  | IArith { opc; rd; rs1; imm }  -> opc < rd $ rs1 = imm
+  | Csr { opc; rd; rs1; imm }     -> opc < rd = imm $ rs1
   | Load { opc; rd; rs1; imm }    -> opc < rd = imm $$ rs1
   | Store { opc; rs1; rs2; imm }  -> opc < rs2 = imm $$ rs1
   | Branch { opc; rs1; rs2; imm } -> opc < rs1 $ rs2 == imm
