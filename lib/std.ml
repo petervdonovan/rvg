@@ -191,11 +191,10 @@ let binaryMathOp op args _ _ _ _ _ r =
   let arg0, _ = args |> List.hd |> getNumericalArg r in
   let arg1, _ = List.nth args 1 |> getNumericalArg r in
   Ast.ParsedAsm (Assembly.Fragment (string_of_int (op arg0 arg1))), Ast.metaInitial r
-let plus = binaryMathOp (+)
-let minus = binaryMathOp (-)
-let times = binaryMathOp ( * )
-let dividedBy = binaryMathOp (/)
-let modulo = binaryMathOp (mod)
+let binaryMathOpMod op args _ _ closure _ _ r =
+  assertExactlyNArgs 1 args r;
+  let m, _ = getNumericalArg r (List.hd args) in
+  emptyLam 2 r closure (binaryMathOp (fun a b -> let op'ed = (op a b) mod m in if op'ed >= 0 then op'ed else op'ed + m))
 let assertNumericalComparisonResult comparator description args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r;
   let arg0, _ = args |> List.hd |> getNumericalArg r in
@@ -253,11 +252,15 @@ let stdFun: Ast.lam_function E.t = E.empty
   |> E.add "frag?" isFragment
   |> E.add "block?" isFinishedBlock
   |> E.add "reg?" isReg
-  |> E.add "+" plus
-  |> E.add "*" times
-  |> E.add "-" minus
-  |> E.add "/" dividedBy
-  |> E.add "%" modulo
+  |> E.add "+" (binaryMathOp (+))
+  |> E.add "*" (binaryMathOp ( * ))
+  |> E.add "-" (binaryMathOp (-))
+  |> E.add "/" (binaryMathOp (/))
+  |> E.add "%" (binaryMathOp (mod))
+  |> E.add "mod+" (binaryMathOpMod (+))
+  |> E.add "mod*" (binaryMathOpMod ( * ))
+  |> E.add "mod-" (binaryMathOpMod (-))
+  |> E.add "mod/" (binaryMathOpMod (/))
   |> E.add "=!" (assertNumericalComparisonResult (=) "exactly")
   |> E.add "<!" (assertNumericalComparisonResult (<) "less than")
   |> E.add "<=!" (assertNumericalComparisonResult (<=) "less than or equal to")
