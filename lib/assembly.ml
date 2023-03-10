@@ -312,7 +312,7 @@ let tryParse env str =
       else if opcode = "csrw" then parseCsrw
       else if opcode = "csrr" then parseCsrr
       else if opcode = "rdcycle" then parseRdcycle
-      else if String.ends_with ~suffix:":" opcode
+      else if String.ends_with ~suffix:":" opcode && String.length opcode > 1
         then fun _ _ _ -> Some (Instruction(Label (
           String.sub opcode 0 (String.length opcode - 1),
           String.capitalize_ascii opcode = opcode
