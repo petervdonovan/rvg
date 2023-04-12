@@ -1,0 +1,3 @@
+[submodule "tests/integration.t/rvg-stdlib"]
+	path = tests/integration.t/rvg-stdlib
+	url = https://github.com/petervdonovan/rvg-stdlib.git
