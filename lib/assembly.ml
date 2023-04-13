@@ -315,7 +315,7 @@ let tryParse env str =
       else if String.ends_with ~suffix:":" opcode && String.length opcode > 1
         then fun _ _ _ -> Some (Instruction(Label (
           String.sub opcode 0 (String.length opcode - 1),
-          String.capitalize_ascii opcode = opcode
+          String.uppercase_ascii opcode = opcode
         )))
         else fun _ _ _ -> None
     ) env (opcode, r) s')
