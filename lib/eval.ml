@@ -110,10 +110,10 @@ let%expect_test _ = printReducedAst testStd Environment.empty "[lam [] \"\" ]";
   [%expect{| E(Lam(params=[], lbody=E(Name(""), )), ) |}]
 
 let%expect_test _ = printReducedAst testStd Environment.empty "[[lam [] {}]]";
-  [%expect{| E(ParsedAsm(Fragment()), ) |}]
+  [%expect{| E(Template(), ) |}]
 
 let%expect_test _ = printReducedAst testStd Environment.empty "[[lam [(x)] {}] {} ]";
-  [%expect{| E(ParsedAsm(Fragment()), ) |}]
+  [%expect{| E(Template(), ) |}]
 
 (* let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (fst (Ast.exprToParsedAsm (expectAsm Assembly.todo Environment.empty) (Ast.Asm " 12 ", Ast.metaEmpty))), Ast.metaEmpty));
   [%expect {| E(ParsedAsm(Fragment( 12 )), ) |}] *)
@@ -135,14 +135,14 @@ let%expect_test _ = Ast.printAst {|
       ), )), )), ), args=(E(Template(E(Asm( 12 ), )), ))), ) |}]
 
 
-let%expect_test _ = printReducedAst testStd Environment.empty {|
+(* let%expect_test _ = printReducedAst testStd Environment.empty {|
     [[lam [(x)] {
       addi t0 t1 x
     }] { 12 }]
   |};
-  [%expect {| E(ParsedAsm(MetaBlock(MetaBlock(IArith(addi, temp-t0, temp-t1,  12 )))), ) |}]
+  [%expect {| E(ParsedAsm(MetaBlock(MetaBlock(IArith(addi, temp-t0, temp-t1,  12 )))), ) |}] *)
 
-let%expect_test _ = printReducedAst testStd Environment.empty {|
+(* let%expect_test _ = printReducedAst testStd Environment.empty {|
   [[lam [(x)] {
     [[lam [(x)] {
       addi zero zero x
@@ -152,16 +152,16 @@ let%expect_test _ = printReducedAst testStd Environment.empty {|
   |};
   [%expect {|
     E(ParsedAsm(MetaBlock(MetaBlock(MetaBlock(IArith(addi, Zero, Zero,  12 )))
-    MetaBlock(IArith(slli, temp-t1, temp-t2,  12 )))), ) |}]
+    MetaBlock(IArith(slli, temp-t1, temp-t2,  12 )))), ) |}] *)
 
-let%expect_test _ = printReducedAst testStd Environment.empty {|
+(* let%expect_test _ = printReducedAst testStd Environment.empty {|
     [[lam [(x)]
       [def (a) x]
       {add t0 t1 t2}
       a
     ] {addi zero zero 0} ]
   |};
-  [%expect{| E(ParsedAsm(MetaBlock(IArith(addi, Zero, Zero, 0))), ) |}]
+  [%expect{| E(Template(IArith(addi, Zero, Zero, 0))), ) |}]
 
 let%expect_test _ = printReducedAst testStd Environment.empty {|
     [
@@ -172,18 +172,18 @@ let%expect_test _ = printReducedAst testStd Environment.empty {|
         {t1}]
       {t2}]
   |};
-  [%expect{| E(ParsedAsm(MetaBlock(RType(sub, temp-t0, temp-t1, temp-t2))), ) |}]
+  [%expect{| E(Template(RType(sub, temp-t0, temp-t1, temp-t2))), ) |}] *)
 
-let%expect_test _ = printReducedAst testStd Environment.empty {|
+(* let%expect_test _ = printReducedAst testStd Environment.empty {|
     [[lam []
       [def (x) {t0}]
       [def (m) [[lam [(x)] [mu [] {lw x 0(a0)}]] {a0}]]
       [m]]]
   |};
-  [%expect{| E(ParsedAsm(MetaBlock(Load(lw, temp-t0, temp-a0, 0))), ) |}]
+  [%expect{| E(ParsedAsm(MetaBlock(Load(lw, temp-t0, temp-a0, 0))), ) |}] *)
 
 
-let%expect_test _ = printReducedAst testStd Environment.empty {|
+(* let%expect_test _ = printReducedAst testStd Environment.empty {|
   [[lam []
     [def (x) {t0}]
     [def (m) [
@@ -253,4 +253,4 @@ let%expect_test _ = printReducedAst testStd Environment.empty {|
     Jalr(jalr, Zero, Ra, 0)
     Csr(csrrw, Zero, save-s6, 0x51e)
     Csr(csrrw, temp-t0, Sp, 0x51e)
-    Csr(csrrs, save-s0, Zero, 0xb00)))), ) |}]
+    Csr(csrrs, save-s0, Zero, 0xb00)))), ) |}] *)

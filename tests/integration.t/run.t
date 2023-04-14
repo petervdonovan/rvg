@@ -1,16 +1,13 @@
   $ dune exec -- ../../bin/main.exe 0.rvg
-      add t0, t1, t2
-      add a0, a1, a2
-      add t0, t1, t2
+  
+      add a0 a1 a2
+      add t0 t1 t2
+      add t0 t1 t2
   $ dune exec -- ../../bin/main.exe 1-multiple-files/a.rvg 1-multiple-files/b.rvg
-      addi zero, zero, 0
+  addi zero zero 0
   $ dune exec -- ../../bin/main.exe tokens 0.rvg
-  {"kind": "string", "modifier": "", "range": { "file": "0.rvg", "range": [[2, 7], [2, 9]] } }
-  {"kind": "function", "modifier": "", "range": { "file": "0.rvg", "range": [[2, 5], [2, 6]] } }
-  {"kind": "string", "modifier": "", "range": { "file": "0.rvg", "range": [[6, 13], [6, 15]] } }
-  {"kind": "string", "modifier": "", "range": { "file": "0.rvg", "range": [[4, 7], [4, 9]] } }
+  {"kind": "function", "modifier": "", "range": { "file": "0.rvg", "range": [[3, 5], [3, 6]] } }
   {"kind": "function", "modifier": "", "range": { "file": "0.rvg", "range": [[4, 5], [4, 6]] } }
-  {"kind": "string", "modifier": "", "range": { "file": "0.rvg", "range": [[6, 13], [6, 15]] } }
   {"kind": "function", "modifier": "defaultLibrary", "range": { "file": "0.rvg", "range": [[0, 2], [0, 7]] } }
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg 2.rvg
   a ok

@@ -1,8 +1,8 @@
 [[print [
   [lam [(e) (x)] {
-    [e x]
     add a0 a1 a2
     [e x]
-  }]
+    [e x]
+}]
   [lam [(x)] x]
   {add t0 t1 t2}]]]
