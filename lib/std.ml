@@ -153,16 +153,40 @@ let rec getCycles r (f: Assembly.finished_block) =
       | None -> raise (AssertionFail ("Failed to determine exact number of cycles", r)))
     | Assembly.MetaBlock mb -> List.fold_left (+) 0 (List.map (getCycles r) mb |> List.map snd)))
   in ({content; provides; totalCycles=Some totalCycles'; cyclesMod}: Assembly.finished_block), totalCycles'
-let getFinishedBlock env r asmexpr =
+let getFinishedBlock _ r asmexpr =
   let failure = (IllegalArgument ("Expected argument of type FinishedBlock but got " ^ (Ast.exprToString asmexpr), r)) in
   match asmexpr with
   | Ast.ParsedAsm pasm, metadata -> (match pasm with
     | Assembly.FinishedBlock asmtem' -> asmtem', metadata
-    | Assembly.Block b -> (match Assembly.promoteOrDemote env b with
+    (* | Assembly.Block b -> (match Assembly.promoteOrDemote env b with
       | Assembly.FinishedBlock asmtem' -> asmtem', metadata
-      | _ -> raise failure)
+      | _ -> raise failure) *)
     | _ -> raise failure)
   | _ -> raise failure
+let rec parseFinishedBlockRec args currentEnv r =
+  match List.hd args with
+  | Ast.Template tem, metadata ->
+    tem |> List.map (fun x -> parseFinishedBlockRec [x] currentEnv r)
+      |> List.map (fun (block, (metadata: Ast.metadata)) -> match block with
+        | Ast.ParsedAsm (Assembly.FinishedBlock pasm) -> pasm
+        | _ -> raise (IllegalArgument ("Expected parsed asm", metadata.r)))
+      |> fun contents -> Assembly.MetaBlock contents
+      |> Assembly.finishedBlockOf
+      |> fun block -> Ast.ParsedAsm (Assembly.FinishedBlock block), metadata
+  | Ast.Asm s, metadata ->
+    s |> String.split_on_char '\n'
+      |> List.map (Assembly.tryParse (Eval.expectAsm r currentEnv))
+      |> List.map (fun block -> (match block with
+        | Some block -> Assembly.finishedBlockOf block
+        | _ -> raise (IllegalArgument ("Expected valid assembly", r))))
+      |> fun it -> Assembly.MetaBlock it
+      |> Assembly.finishedBlockOf
+      |> fun block -> Ast.ParsedAsm (Assembly.FinishedBlock block), metadata
+  | Ast.ParsedAsm pasm, metadata -> Ast.ParsedAsm pasm, metadata
+  | _ -> raise (IllegalArgument ("Expected template or string", r))
+let parseFinishedBlock args _ _ _ currentEnv _ r = (
+  assertExactlyNArgs 1 args r;
+  parseFinishedBlockRec args currentEnv r)
 let exactCycles args _ _ _ currentEnv _ r =
   assertExactlyNArgs 1 args r;
   let asmexpr = args |> List.hd in
@@ -244,6 +268,7 @@ let stdFun: Ast.lam_function E.t = E.empty
   |> E.add "cycles?" exactCycles
   |> E.add "cycles!" safeAssertKCycles
   |> E.add "unsafe-assert-exact-cycles" unsafeAssertKCycles
+  |> E.add "block!" parseFinishedBlock
   |> E.add "addattr" addattr
   |> E.add "hasattr" hasattr
   |> E.add "lam?" isLam

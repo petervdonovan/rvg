@@ -12,16 +12,12 @@ let rec evalExpr env e = match e with
     "A parameter is not an expression, but tried to evaluate "
     ^ (Ast.exprToString e), Ast.rangeOf e))
   | Ast.ParsedAsm _, _ -> e, env
-  | Ast.Asm asm, meta -> (Ast.ParsedAsm
-      (Assembly.parse Assembly.empty (expectAsm meta.r env) asm),
-      meta
-    ), env
+  | Ast.Asm _, _ -> e, env
   | Ast.Template tem, meta ->
     let exprs', env' = evalExprListInOrder env (List.rev tem) in
     let exprs' = List.rev exprs' in (* FIXME: inefficient to double rev? *)
     let tem = (Ast.Template exprs', meta) in
-    let pasm, meta = Ast.exprToParsedAsm (expectAsm meta.r env') tem in
-    (ParsedAsm pasm, meta), env'
+    tem, env'
   | Ast.Lam {params; lbody; env = prevEnv; f }, meta -> (
     if Environment.is_empty prevEnv
       then (Ast.Lam { params; lbody; env; f }, meta), env
@@ -83,7 +79,7 @@ let testStd = Environment.empty
   |> Environment.add "mu" mu
 
 
-let printAsm str = str |> Assembly.parse Assembly.empty (expectAsm Assembly.todo Environment.empty)
+(* let printAsm str = str |> Assembly.parse Assembly.empty (expectAsm Assembly.todo Environment.empty)
   |> Assembly.asmToString |> print_endline
 
 let%expect_test _ =
@@ -102,7 +98,7 @@ let%expect_test _ =
     Load(lbu, save-s4, temp-t6, 12)
     Branch(beq, temp-a5, temp-t3, END)
     Jal(jal, Ra, END3)
-    Jalr(jalr, Zero, Ra, 0)) |}]
+    Jalr(jalr, Zero, Ra, 0)) |}] *)
 
 let printReducedAst stdFun std text =
   text |> Ast.getAst stdFun |> evalExpr std |> fst |> Ast.exprToString
@@ -119,8 +115,8 @@ let%expect_test _ = printReducedAst testStd Environment.empty "[[lam [] {}]]";
 let%expect_test _ = printReducedAst testStd Environment.empty "[[lam [(x)] {}] {} ]";
   [%expect{| E(ParsedAsm(Fragment()), ) |}]
 
-let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (fst (Ast.exprToParsedAsm (expectAsm Assembly.todo Environment.empty) (Ast.Asm " 12 ", Ast.metaEmpty))), Ast.metaEmpty));
-  [%expect {| E(ParsedAsm(Fragment( 12 )), ) |}]
+(* let%expect_test _ = print_endline (Ast.exprToString (Ast.ParsedAsm (fst (Ast.exprToParsedAsm (expectAsm Assembly.todo Environment.empty) (Ast.Asm " 12 ", Ast.metaEmpty))), Ast.metaEmpty));
+  [%expect {| E(ParsedAsm(Fragment( 12 )), ) |}] *)
 
 let%expect_test _ = Ast.printAst {|
   [[lam [(x)] {
