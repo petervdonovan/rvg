@@ -19,14 +19,13 @@ let nargs = match currentMode with
   | Hover _ -> 4
   | Execution -> 0
 let sideEffectsAllowed = currentMode = Execution
-let rec print arg =
-  if sideEffectsAllowed then
-  (match arg with
+let rec unconditionalPrint arg = match arg with
   | Ast.ParsedAsm pasm, _ -> Assembly.print pasm
-  | Ast.Template tem, _ -> List.iter (fun x -> print x |> ignore;) tem;
+  | Ast.Template tem, _ -> List.iter (fun x -> unconditionalPrint x |> ignore;) tem;
   | Ast.Asm asm, _ -> print_string asm;
-  | _ -> print_endline (Ast.exprToString arg));
-  arg
+  | _ -> print_endline (Ast.exprToString arg)
+let print arg =
+  if sideEffectsAllowed then unconditionalPrint arg; arg
 let posToList (p: CharStream.position) = "[" ^ (string_of_int p.zeroBasedLine) ^ ", " ^ (string_of_int p.zeroBasedCol) ^ "]"
 let rangeToList (r: CharStream.range) = "[" ^ (posToList r.startInclusive) ^ ", " ^ (posToList r.endExclusive) ^ "]"
 let rangeToJson (r: CharStream.range) = "{ \"file\": \"" ^ r.startInclusive.file ^ "\", \"range\": " ^ (rangeToList r) ^ " }"

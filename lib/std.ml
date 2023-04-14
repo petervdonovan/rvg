@@ -23,10 +23,9 @@ let getNumericalArg r arg =
     | None -> raise (IllegalArgument ("\"" ^ n ^ "\" is not a number", r))
     | Some k -> k, meta)
   | _ -> raise (IllegalArgument ("Expected numerical arg, but got expression \"" ^ (Ast.exprToString arg) ^ "\"of the wrong type", r))
-let errorReportingPrintExpr e =
-  print_endline ((match getStringArgOpt e with
-  | Some (s, _) -> s
-  | None -> Ast.exprToString e)  ^ ": " ^ (Ast.locationToString e))
+let errorReportingPrintExpr e = match getStringArgOpt e with
+  | Some (s, _) -> print_endline s
+  | None -> SideEffects.unconditionalPrint e; print_endline (": " ^ (Ast.locationToString e))
 let trueLambda = Ast.Lam {
   params=[]; lbody=[]; env=E.empty;
   f=fun args _ _ _ _ _ r -> assertExactlyNArgs 2 args r; List.hd args
@@ -153,7 +152,7 @@ let rec getCycles r (f: Assembly.finished_block) =
       | None -> raise (AssertionFail ("Failed to determine exact number of cycles", r)))
     | Assembly.MetaBlock mb -> List.fold_left (+) 0 (List.map (getCycles r) mb |> List.map snd)))
   in ({content; provides; totalCycles=Some totalCycles'; cyclesMod}: Assembly.finished_block), totalCycles'
-let getFinishedBlock _ r asmexpr =
+(* let getFinishedBlock _ r asmexpr =
   let failure = (IllegalArgument ("Expected argument of type FinishedBlock but got " ^ (Ast.exprToString asmexpr), r)) in
   match asmexpr with
   | Ast.ParsedAsm pasm, metadata -> (match pasm with
@@ -162,11 +161,11 @@ let getFinishedBlock _ r asmexpr =
       | Assembly.FinishedBlock asmtem' -> asmtem', metadata
       | _ -> raise failure) *)
     | _ -> raise failure)
-  | _ -> raise failure
-let rec parseFinishedBlockRec args currentEnv r =
-  match List.hd args with
+  | _ -> raise failure *)
+let rec parseFinishedBlockRec arg currentEnv r =
+  match arg with
   | Ast.Template tem, metadata ->
-    tem |> List.map (fun x -> parseFinishedBlockRec [x] currentEnv r)
+    tem |> List.map (fun x -> parseFinishedBlockRec x currentEnv r)
       |> List.map (fun (block, (metadata: Ast.metadata)) -> match block with
         | Ast.ParsedAsm (Assembly.FinishedBlock pasm) -> pasm
         | _ -> raise (IllegalArgument ("Expected parsed asm", metadata.r)))
@@ -175,10 +174,11 @@ let rec parseFinishedBlockRec args currentEnv r =
       |> fun block -> Ast.ParsedAsm (Assembly.FinishedBlock block), metadata
   | Ast.Asm s, metadata ->
     s |> String.split_on_char '\n'
+      |> List.filter (fun s -> String.trim s <> "")
       |> List.map (Assembly.tryParse (Eval.expectAsm r currentEnv))
       |> List.map (fun block -> (match block with
         | Some block -> Assembly.finishedBlockOf block
-        | _ -> raise (IllegalArgument ("Expected valid assembly", r))))
+        | _ -> raise (IllegalArgument ("Expected valid assembly but got " ^ (Ast.exprToString arg), r))))
       |> fun it -> Assembly.MetaBlock it
       |> Assembly.finishedBlockOf
       |> fun block -> Ast.ParsedAsm (Assembly.FinishedBlock block), metadata
@@ -186,18 +186,23 @@ let rec parseFinishedBlockRec args currentEnv r =
   | _ -> raise (IllegalArgument ("Expected template or string", r))
 let parseFinishedBlock args _ _ _ currentEnv _ r = (
   assertExactlyNArgs 1 args r;
-  parseFinishedBlockRec args currentEnv r)
+  parseFinishedBlockRec (List.hd args) currentEnv r)
+let getFinishedBlock arg currentEnv r =
+  let fb, metadata = parseFinishedBlockRec arg currentEnv r in
+  match fb with
+  | Ast.ParsedAsm (Assembly.FinishedBlock f) -> f, metadata
+  | _ -> raise (IllegalArgument ("Expected ParsedAsm", r))
 let exactCycles args _ _ _ currentEnv _ r =
   assertExactlyNArgs 1 args r;
   let asmexpr = args |> List.hd in
-  let asmtem', metadata = getFinishedBlock (Eval.expectAsm r currentEnv) r asmexpr in
+  let asmtem', metadata = getFinishedBlock asmexpr currentEnv r in
     let _, k = getCycles r asmtem' in
       Ast.ParsedAsm (Assembly.Fragment (string_of_int k)), metadata
 let safeAssertKCycles args _ _ closure currentEnv _ r =
   assertExactlyNArgs 1 args r;
   let k, _ = args |> List.hd |> getNumericalArg r in
   emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
-  args' |> List.hd |> getFinishedBlock (Eval.expectAsm r currentEnv) r
+  args' |> List.hd |> fun x -> getFinishedBlock x currentEnv r
   |> fst |> getCycles r |> (
     fun (x, k') ->
       if k = k' then Ast.ParsedAsm (Assembly.FinishedBlock x)
@@ -208,7 +213,7 @@ let unsafeAssertKCycles args _ _ closure currentEnv _ r =
   emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
     let k, _ = args |> List.hd |> getNumericalArg r in
     let asmexpr = args' |> List.hd in
-    let asmtem', metadata = getFinishedBlock (Eval.expectAsm r currentEnv) r asmexpr in
+    let asmtem', metadata = getFinishedBlock asmexpr currentEnv r in
       Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')), metadata)
 let binaryMathOp op args _ _ _ _ _ r =
   assertExactlyNArgs 2 args r;
@@ -305,7 +310,7 @@ let%expect_test _ = (try
   |} with
     | AssertionFail (s, r) -> print_endline s; print_endline (CharStream.rangeToString r)
     | Eval.EvalFail (s, _) -> print_string s);
-  [%expect{| Expected Lam but got E(ParsedAsm(Fragment(help)), ) |}]
+  [%expect{| Expected Lam but got E(Template(E(Asm(help), )), ) |}]
 
 let%expect_test _ = (try
   Eval.printReducedAst stdFun std {|
