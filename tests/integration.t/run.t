@@ -15,7 +15,7 @@
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg 3.rvg
   good 0
   good 1
-  E(Lam(params=[E(Var(name=b), )], lbody=E(Name(b), ); E(Template(E(Asm(this should fail), )), )), ): [3.rvg] line 7, col 21 to line 7, col 31
+  E(Lam(params=[E(Var(name=b), )], lbody=E(Name(b), ); E(Template(E(Asm(this should fail), )), )), ): [3.rvg] line 7, col 19 to line 7, col 29
   Expected lam of 2 parameters: [rvg-stdlib/stdlib.rvg] line 12, col 13 to line 12, col 48
   [rvg-stdlib/stdlib.rvg] line 7, col 4 to line 7, col 13: Assertion failed
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg 4.rvg

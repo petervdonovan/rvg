@@ -13,19 +13,11 @@ let assertExactlyNArgs n args r =
   assertNArgs ((<>) n) ("exactly " ^ (string_of_int n)) args r
 let assertAtLeastNArgs n args r =
   assertNArgs ((>) n) ("at least " ^ (string_of_int n)) args r
-let getStringArgOpt arg =
-  match arg with
-  | Ast.ParsedAsm (Assembly.Fragment n), meta -> Some (n, meta)
-  | _ -> None
 let getNumericalArg r arg =
-  match getStringArgOpt arg with
-  | Some (n, meta) -> (match int_of_string_opt n with
-    | None -> raise (IllegalArgument ("\"" ^ n ^ "\" is not a number", r))
-    | Some k -> k, meta)
-  | _ -> raise (IllegalArgument ("Expected numerical arg, but got expression \"" ^ (Ast.exprToString arg) ^ "\"of the wrong type", r))
-let errorReportingPrintExpr e = match getStringArgOpt e with
-  | Some (s, _) -> print_endline s
-  | None -> SideEffects.unconditionalPrint e; print_endline (": " ^ (Ast.locationToString e))
+  (match arg with
+  | Ast.Integer i, meta -> i, meta
+  | _ -> raise (IllegalArgument ("Expected numerical arg, but got expression \"" ^ (Ast.exprToString arg) ^ "\"of the wrong type", r)))
+let errorReportingPrintExpr e = SideEffects.unconditionalPrint e; print_endline (": " ^ (Ast.locationToString e))
 let trueLambda = Ast.Lam {
   params=[]; lbody=[]; env=E.empty;
   f=fun args _ _ _ _ _ r -> assertExactlyNArgs 2 args r; List.hd args
@@ -60,13 +52,13 @@ let fail args _ _ closure _ _ r = (
   args |> List.iter errorReportingPrintExpr;
   raise (AssertionFail ("Assertion failed", r)))
 )
-let acceptFragment description args r =
+let acceptFragment _ args r =
   assertExactlyNArgs 1 args r;
-  let attr = List.hd args in
-  match attr with
-  | Ast.ParsedAsm Assembly.Fragment s, meta ->
-    s, meta
-  | _ -> raise (AssertionFail (description ^ " is not a fragment", r))
+  let attr, meta = List.hd args in
+  Ast.exprContentToString attr, meta
+  (* match attr with
+  | Ast.Asm s, meta -> s, meta
+  | _ -> raise (AssertionFail (description ^ " " ^ (Ast.exprToString attr) ^ " is not a fragment", r)) *)
 let addattr args _ _ closure _ _ r = (
   let s, _ = acceptFragment "Attribute" args r in
   emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
@@ -120,10 +112,7 @@ let isX predicate args _ _ _ _ _ r  = (
   if predicate arg then trueLambda, meta' else falseLambda, meta'
 )
 let isNum = isX (fun arg -> match arg with
-  | Ast.ParsedAsm Assembly.Fragment s ->
-    (match int_of_string_opt s with
-    | Some _ -> true
-    | None -> false)
+  | Ast.Integer _ -> true
   | _ -> false)
 let isFragment = isX (fun arg -> match arg with
   | Ast.ParsedAsm Assembly.Fragment _ -> true
@@ -135,8 +124,8 @@ let isFinishedBlock = isX (fun arg -> match arg with
 let isReg args _ _ _ currentEnv _ r  = (
   assertExactlyNArgs 1 args r;
   let arg, meta' = List.hd args in
-  match arg with
-  | Ast.ParsedAsm Assembly.Fragment s ->
+  match Ast.unwrap (arg, meta') with
+  | Some s ->
     (try ignore(Assembly.nameToReg (Eval.expectAsm meta'.r currentEnv) (s, meta'.r)); trueLambda, meta'
     with _ -> falseLambda, meta')
   | _ -> falseLambda, meta')

@@ -25,6 +25,7 @@ type expr_content =
   | Lam of lam
   | LamApplication of lam_application
   | Def of define
+  | Integer of int
 and expr = expr_content * metadata
 and template = expr list
 and var = {
@@ -67,6 +68,7 @@ let rec exprContentToString (e: expr_content): string = match e with
     ^ String.concat ", " (List.map exprToString args)
     ^ "))"
   | Def {dname; dvalue} -> funNotation "Def" [exprToString (Var (fst dname), snd dname); sequenceToString dvalue]
+  | Integer i -> Int.to_string i
 and exprToString (e: expr): string = let content, metadata = e in
   funNotation "E" [exprContentToString content; String.concat ";" (Attributes.elements metadata.attrs)]
 and sequenceToString seq = seq |> List.map exprToString |> String.concat "; "
@@ -154,7 +156,9 @@ and parseExpr std t s (r: CharStream.range) =
   if t = "[" then parseList std r.startInclusive s
   else if String.starts_with ~prefix:"{" t then let (template, r', s) = parseTemplate std r.startInclusive s in
   (Template template, metaInitial r'), s
-  else (Name t, metaInitial r), s
+  else (match int_of_string_opt t with
+  | Some i -> (Integer i, metaInitial r), s
+  | None -> (Name t, metaInitial r), s)
 and parseExprs std acc stream =
   match CharStream.parseToken stream with
   | Some ("]", s, _) -> acc, s
@@ -187,10 +191,7 @@ and parseArgs std stream accumulator =
   match token with
   | Some ("]", s, _) -> accumulator, s
   | Some (t, s, r) ->
-    let nextExpr, s' =
-      if t = "[" then parseList std r.startInclusive s
-      else if String.starts_with ~prefix:"{" t then let tem, r, ss' = parseTemplate std r.startInclusive s in (Template tem, metaInitial r), ss'
-      else (Name t, metaInitial r), s
+    let nextExpr, s' = parseExpr std t s r
     in parseArgs std s' (nextExpr :: accumulator)
   | None -> raise (ParseFail ("Expected arg or ']', not end-of-file", (stream: CharStream.t).current))
 and parseVarList std startInclusive accumulator stream =
@@ -203,6 +204,10 @@ and parseVarList std startInclusive accumulator stream =
   | None -> raise (ParseFail ("Expected ']' or '(', not end-of-file", (stream: CharStream.t).current))
 let thisIsUnevaluatedOrNotAssembly description e =
   raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly", (snd e).r))
+let rec unwrap e = match e with
+  | Template tem, _ -> if List.length tem = 1 then tem |> List.hd |> unwrap else None
+  | Asm s, _ -> Some s
+  | _ -> None
 (* let rec exprToParsedAsm env e =
   let content, meta = e in
   match content with

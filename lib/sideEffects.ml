@@ -23,7 +23,8 @@ let rec unconditionalPrint arg = match arg with
   | Ast.ParsedAsm pasm, _ -> Assembly.print pasm
   | Ast.Template tem, _ -> List.iter (fun x -> unconditionalPrint x |> ignore;) tem;
   | Ast.Asm asm, _ -> print_string asm;
-  | _ -> print_endline (Ast.exprToString arg)
+  | Ast.Integer i, _ -> print_int i;
+  | _ -> print_string (Ast.exprToString arg)
 let print arg =
   if sideEffectsAllowed then unconditionalPrint arg; arg
 let posToList (p: CharStream.position) = "[" ^ (string_of_int p.zeroBasedLine) ^ ", " ^ (string_of_int p.zeroBasedCol) ^ "]"
@@ -63,6 +64,7 @@ let reportResolvedName range expr =
           | Assembly.Fragment _ -> "fragment")
         | Ast.Template _ -> raise Unreachable
         | Ast.Var _ -> raise Unreachable
+        | Ast.Integer _ -> raise Unreachable
       ) ^ {|"], "cycles": |} ^ (match content with
         | Ast.ParsedAsm (Assembly.FinishedBlock (
             {totalCycles=Some k; _}: Assembly.finished_block)

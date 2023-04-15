@@ -1,15 +1,15 @@
 [stdlib [mu []
-[def (+=) [lam [(k num!)] [lam [(r reg!)] {
+[def (+= [-> block!]) [lam [(k num!)] [lam [(r reg!)] {
     addi r r k
 }]]]
 [def (testblock) {
-    [[+= {4}] {t0}]
+    [[+= 4] {t0}]
     add t0 t0 t1
-    [[+= {67}] {t0}]
+    [[+= 67] {t0}]
 }]
 [[print testblock]]
 {testblock takes 3 cycles to execute, so "exact_cycles 4 testblock" would fail}
-[def (testblock') [[unsafe-assert-exact-cycles {4}] testblock]]
-[[cycles! {4}] testblock']
-[[cycles! {3}] testblock']
+[def (testblock') [[unsafe-assert-exact-cycles 4] testblock]]
+[[cycles! 4] testblock']
+[[cycles! 3] testblock']
 ]]

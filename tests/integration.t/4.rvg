@@ -1,7 +1,7 @@
 [stdlib [mu []
-  [[[lam! {0}] [print {testing lam!
+  [[[lam! 0] [print {testing lam!
 }]]]
-  [def (a [lamof [lam! {1}]]) [lam [(a)] [[print {executing identity
+  [def (a [lamof [lam! 1]]) [lam [(a)] [[print {executing identity
 }]] a]]
   [def (b) [a [lam [(x)] [print {Hello}]]]]
   [b {ignored}]

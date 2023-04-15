@@ -8,6 +8,7 @@ let rec evalExpr env e = match e with
     SideEffects.reportResolvedName meta.r definition;
     evalExpr env definition
     else raise (EvalFail ("Unbound name: " ^ str, Ast.rangeOf e))
+  | Ast.Integer _, _ -> e, env
   | Ast.Var _, _ -> raise (EvalFail (
     "A parameter is not an expression, but tried to evaluate "
     ^ (Ast.exprToString e), Ast.rangeOf e))

@@ -1,5 +1,5 @@
 [stdlib [mu []
-[if [frag? {23}] [print {ok 23
+[if [frag? 23] [print {ok 23
 }] [print {failed}]]
 [if [frag? {nop}] [print {failed}] [print {ok nop
 }]]
