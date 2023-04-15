@@ -205,8 +205,8 @@ and parseVarList std startInclusive accumulator stream =
 let thisIsUnevaluatedOrNotAssembly description e =
   raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly", (snd e).r))
 let rec unwrap e = match e with
-  | Template (tem, _), _ -> if List.length tem = 1 then tem |> List.hd |> unwrap else None
-  | Asm s, _ -> Some s
+  | Template (tem, _) -> if List.length tem = 1 then tem |> List.hd |> fst |> unwrap else None
+  | Asm s -> Some s
   | _ -> None
 (* let rec exprToParsedAsm env e =
   let content, meta = e in

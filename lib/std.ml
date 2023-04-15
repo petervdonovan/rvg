@@ -116,6 +116,8 @@ let isNum = isX (fun arg -> match arg with
   | _ -> false)
 let isFragment = isX (fun arg -> match arg with
   | Ast.ParsedAsm Assembly.Fragment _ -> true
+  | Ast.Asm _ -> true
+  | Ast.Template _ -> Ast.unwrap arg |> Option.is_some
   | _ -> false)
 let isFinishedBlock = isX (fun arg -> match arg with
   | Ast.ParsedAsm Assembly.FinishedBlock _ -> true
@@ -124,7 +126,7 @@ let isFinishedBlock = isX (fun arg -> match arg with
 let isReg args _ _ _ currentEnv _ r  = (
   assertExactlyNArgs 1 args r;
   let arg, meta' = List.hd args in
-  match Ast.unwrap (arg, meta') with
+  match Ast.unwrap arg with
   | Some s ->
     (try ignore(Assembly.nameToReg (Eval.expectAsm meta'.r currentEnv) (s, meta'.r)); trueLambda, meta'
     with _ -> falseLambda, meta')
@@ -208,7 +210,7 @@ let binaryMathOp op args _ _ _ _ _ r =
   assertExactlyNArgs 2 args r;
   let arg0, _ = args |> List.hd |> getNumericalArg r in
   let arg1, _ = List.nth args 1 |> getNumericalArg r in
-  Ast.ParsedAsm (Assembly.Fragment (string_of_int (op arg0 arg1))), Ast.metaInitial r
+  Ast.Integer (op arg0 arg1), Ast.metaInitial r
 let binaryMathOpMod op args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r;
   let m, _ = getNumericalArg r (List.hd args) in

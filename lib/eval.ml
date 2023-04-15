@@ -51,7 +51,7 @@ and expectAsm r env name description =
     then let e, _ = evalExpr env (Environment.find name env) in
     match e with
     | (Ast.Integer i, meta) -> string_of_int i, meta.r
-    | (Ast.Template _, meta) -> (match Ast.unwrap e with
+    | (Ast.Template tem, meta) -> (match Ast.unwrap (Ast.Template tem) with
       | Some good -> good, meta.r
       | None -> raise (badExprType e))
     | (Ast.Asm num, meta) -> num, meta.r
