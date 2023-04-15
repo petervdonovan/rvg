@@ -47,10 +47,10 @@
       addi t0, t0, 4
       add t0, t0, t1
       addi t0, t0, 67
-  [8.rvg] line 14, col 3 to line 14, col 15: Expected 3 cycles but got 4
+  [8.rvg] line 14, col 3 to line 14, col 13: Expected 3 cycles but got 4
   $ dune exec -- ../../bin/main.exe 9.rvg
   15
-  $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg rvg-stdlib/ctrl.rvg 10.rvg
+  $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg rvg-stdlib/ctrl.rvg rvg-stdlib/single-threaded.rvg 10.rvg
       bgeu zero, t0, DONE_tJ6slU7Skn
       lw t1, 0(t0)
   DONE_tJ6slU7Skn:

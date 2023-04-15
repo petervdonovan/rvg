@@ -6,7 +6,7 @@ rvg-stdlib/stdlib.rvg -> rvg-stdlib/ctrl.rvg -> 6.rvg
 rvg-stdlib/stdlib.rvg -> rvg-stdlib/ctrl.rvg -> 7.rvg
 rvg-stdlib/stdlib.rvg -> rvg-stdlib/ctrl.rvg -> 8.rvg
 rvg-stdlib/stdlib.rvg -> rvg-stdlib/ctrl.rvg -> 9.rvg
-rvg-stdlib/stdlib.rvg -> rvg-stdlib/ctrl.rvg -> 10.rvg
+rvg-stdlib/stdlib.rvg -> rvg-stdlib/ctrl.rvg -> rvg-stdlib/single-threaded.rvg -> 10.rvg
 rvg-stdlib/stdlib.rvg -> rvg-stdlib/ctrl.rvg -> 11.rvg
 rvg-stdlib/stdlib.rvg -> rvg-stdlib/ctrl.rvg -> 12.rvg
 rvg-stdlib/stdlib.rvg -> rvg-stdlib/ctrl.rvg -> 13.rvg
