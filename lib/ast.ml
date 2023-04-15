@@ -27,7 +27,7 @@ type expr_content =
   | Def of define
   | Integer of int
 and expr = expr_content * metadata
-and template = expr list
+and template = expr list * expr Environment.t
 and var = {
   name: string;
   checks: (expr * metadata) list
@@ -61,7 +61,7 @@ let rec exprContentToString (e: expr_content): string = match e with
   | Asm s -> "Asm(" ^ s ^ ")"
   | ParsedAsm asm ->
       funNotation "ParsedAsm" [Assembly.asmToString asm]
-  | Template exprs -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
+  | Template (exprs, _) -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
   | Lam la -> lamMuToString la
   | LamApplication { lam; args } -> "LamApplication(lam=" ^
     exprToString lam ^ ", args=("
@@ -139,8 +139,8 @@ and parseTemplate std startInclusive stream: template * CharStream.range * CharS
   | Some (c, s') -> if c = '|' then "|", s' else "", CharStream.cons c s'
   | None -> "", stream)
   in
-    let template, (s: CharStream.t) = parseTemplateRec std marker s' in
-    template, {startInclusive=startInclusive; endExclusive=s.current}, s
+    let tem, (s: CharStream.t) = parseTemplateRec std marker s' in
+    (tem, Environment.empty), {startInclusive=startInclusive; endExclusive=s.current}, s
 and parseAsm marker stream =
   let pred = fun c -> not (List.mem c ['}';'[']) in
   let asm, r, s = CharStream.takeWhile pred stream in
@@ -205,7 +205,7 @@ and parseVarList std startInclusive accumulator stream =
 let thisIsUnevaluatedOrNotAssembly description e =
   raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly", (snd e).r))
 let rec unwrap e = match e with
-  | Template tem, _ -> if List.length tem = 1 then tem |> List.hd |> unwrap else None
+  | Template (tem, _), _ -> if List.length tem = 1 then tem |> List.hd |> unwrap else None
   | Asm s, _ -> Some s
   | _ -> None
 (* let rec exprToParsedAsm env e =
@@ -229,8 +229,8 @@ let handleParseFail runnable = try runnable () with e -> match e with
     "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s); raise e
   | _ -> raise e
 let testStd = Environment.empty
-  |> Environment.add "lam" (fun _ _ _ _ _ _ _ -> Template [], metaEmpty)
-  |> Environment.add "mu" (fun _ _ _ _ _ _ _ -> Template [], metaEmpty)
+  |> Environment.add "lam" (fun _ _ _ _ _ _ _ -> Template ([], Environment.empty), metaEmpty)
+  |> Environment.add "mu" (fun _ _ _ _ _ _ _ -> Template ([], Environment.empty), metaEmpty)
 let getAst testStd text = text |> (CharStream.fromString "") |> parseTopLevel testStd
 let printAst text: unit =
   text |> getAst testStd |> exprToString |> print_endline

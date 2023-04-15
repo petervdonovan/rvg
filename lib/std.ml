@@ -153,8 +153,8 @@ let rec getCycles r (f: Assembly.finished_block) =
   | _ -> raise failure *)
 let rec parseFinishedBlockRec arg currentEnv r =
   match arg with
-  | Ast.Template tem, metadata ->
-    tem |> List.map (fun x -> parseFinishedBlockRec x currentEnv r)
+  | Ast.Template (tem, closure), metadata ->
+    tem |> List.map (fun x -> parseFinishedBlockRec x closure r)
       |> List.map (fun (block, (metadata: Ast.metadata)) -> match block with
         | Ast.ParsedAsm (Assembly.FinishedBlock pasm) -> pasm
         | _ -> raise (IllegalArgument ("Expected parsed asm", metadata.r)))
@@ -172,7 +172,7 @@ let rec parseFinishedBlockRec arg currentEnv r =
       |> Assembly.finishedBlockOf
       |> fun block -> Ast.ParsedAsm (Assembly.FinishedBlock block), metadata
   | Ast.ParsedAsm pasm, metadata -> Ast.ParsedAsm pasm, metadata
-  | _ -> raise (IllegalArgument ("Expected template or string", r))
+  | _ -> raise (IllegalArgument ("Expected template or string but got " ^ (arg |> Ast.exprToString), r))
 let parseFinishedBlock args _ _ _ currentEnv _ r = (
   assertExactlyNArgs 1 args r;
   parseFinishedBlockRec (List.hd args) currentEnv r)

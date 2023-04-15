@@ -21,7 +21,7 @@ let nargs = match currentMode with
 let sideEffectsAllowed = currentMode = Execution
 let rec unconditionalPrint arg = match arg with
   | Ast.ParsedAsm pasm, _ -> Assembly.print pasm
-  | Ast.Template tem, _ -> List.iter (fun x -> unconditionalPrint x |> ignore;) tem;
+  | Ast.Template (tem, _), _ -> List.iter (fun x -> unconditionalPrint x |> ignore;) tem;
   | Ast.Asm asm, _ -> print_string asm;
   | Ast.Integer i, _ -> print_int i;
   | _ -> print_string (Ast.exprToString arg)

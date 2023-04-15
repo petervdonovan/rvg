@@ -14,10 +14,10 @@ let rec evalExpr env e = match e with
     ^ (Ast.exprToString e), Ast.rangeOf e))
   | Ast.ParsedAsm _, _ -> e, env
   | Ast.Asm _, _ -> e, env
-  | Ast.Template tem, meta ->
+  | Ast.Template (tem, prevEnv), meta ->
     let exprs', env' = evalExprListInOrder env (List.rev tem) in
     let exprs' = List.rev exprs' in (* FIXME: inefficient to double rev? *)
-    let tem = (Ast.Template exprs', meta) in
+    let tem = (Ast.Template (exprs', if Environment.is_empty prevEnv then env else prevEnv), meta) in
     tem, env'
   | Ast.Lam {params; lbody; env = prevEnv; f }, meta -> (
     if Environment.is_empty prevEnv
@@ -45,15 +45,21 @@ and evalSequence r env exprList =
   let head = List.hd exprs' in
   head
 and expectAsm r env name description =
-(if Environment.mem name env
-  then match evalExpr env (Environment.find name env) with
-  | (Ast.Asm num, meta), _ -> num, meta.r
-  | (Ast.ParsedAsm pasm, _), _ -> (match pasm with
-    | Fragment f -> f, r
-    | _ -> raise (Assembly.AsmParseFail ("Expected assembly fragment, but got assembly block", r)))
-  | bad, _ -> raise (Assembly.AsmParseFail (
-    description ^ " expected, but found expression " ^ Ast.exprToString bad, (snd bad).r))
-  else Assembly.failWithNoBinding name r)
+  let badExprType bad = (Assembly.AsmParseFail (
+    description ^ " expected, but found expression " ^ Ast.exprToString bad, (snd bad).r)) in
+  (if Environment.mem name env
+    then let e, _ = evalExpr env (Environment.find name env) in
+    match e with
+    | (Ast.Integer i, meta) -> string_of_int i, meta.r
+    | (Ast.Template _, meta) -> (match Ast.unwrap e with
+      | Some good -> good, meta.r
+      | None -> raise (badExprType e))
+    | (Ast.Asm num, meta) -> num, meta.r
+    | (Ast.ParsedAsm pasm, _) -> (match pasm with
+      | Fragment f -> f, r
+      | _ -> raise (Assembly.AsmParseFail ("Expected assembly fragment, but got assembly block", r)))
+    | bad -> raise (badExprType bad)
+    else Assembly.failWithNoBinding name r)
 and bindNames env params args r =
   let nparams = List.length params in
   let nargs = List.length args in

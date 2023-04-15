@@ -1,8 +1,8 @@
 [stdlib [mu []
-[def (+= [-> block!]) [lam [(k num!)] [lam [(r reg!)] {
+[def (+= [-> [-> block!]]) [lam [(k num!)] [lam [(r reg!)] {
     addi r r k
 }]]]
-[def (testblock) {
+[def (testblock block!) {
     [[+= 4] {t0}]
     add t0 t0 t1
     [[+= 67] {t0}]
