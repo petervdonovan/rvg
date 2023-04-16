@@ -41,20 +41,39 @@ type t =
   | Fragment of fragment
   | Block of block
   | FinishedBlock of finished_block
+let regToString reg = match reg with
+  | TempReg (name, _) -> "temp-" ^ name
+  | SaveReg (name, _) -> "save-" ^ name
+  | Zero _ -> "Zero"
+  | Ra _ -> "Ra"
+  | Sp _ -> "Sp"
+  | Gp _ -> "Gp"
+  | Tp _ -> "Tp"
+let instrToString instr =
+  match instr with
+  | RType { opc: opcode; rd: register; rs1: register; rs2: register } ->
+    ParseUtil.funNotation "RType" ([fst opc] @ List.map regToString [rd;rs1;rs2])
+  | IArith { opc: opcode; rd: register; rs1: register; imm: immediate } ->
+    ParseUtil.funNotation "IArith" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
+  | Csr { opc: opcode; rd: register; rs1: register; imm: immediate } ->
+    ParseUtil.funNotation "Csr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
+  | Load { opc: opcode; rd: register; rs1: register; imm: immediate } ->
+    ParseUtil.funNotation "Load" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
+  | Store { opc: opcode; rs1: register; rs2: register; imm: immediate } ->
+    ParseUtil.funNotation "Store" ([fst opc] @ List.map regToString [rs1;rs2] @ [fst imm])
+  | Branch { opc: opcode; rs1: register; rs2: register; imm: immediate } ->
+    ParseUtil.funNotation "Branch" ([fst opc] @ List.map regToString [rs1;rs2] @ [fst imm])
+  | Jal { opc: opcode; rd: register; imm: immediate } ->
+    ParseUtil.funNotation "Jal" ([fst opc] @ List.map regToString [rd] @ [fst imm])
+  | Jalr { opc: opcode; rd: register; rs1: register; imm: immediate } ->
+    ParseUtil.funNotation "Jalr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
+  | UType { opc: opcode; rd: register; imm: immediate } ->
+    ParseUtil.funNotation "UType" ([fst opc] @ [regToString rd] @ [fst imm] )
+  | Label (s, noncify) -> "Label(" ^ s ^ " " ^ (string_of_bool noncify) ^ ")"
 let rec finishedBlockToStringInternal fb = finishedBlockContentToStringInternal fb.content
 and finishedBlockContentToStringInternal content =
   match content with
-  | Instruction inst -> (match inst with
-    | RType inst -> inst.opc |> fst
-    | IArith inst -> inst.opc |> fst
-    | Csr inst -> inst.opc |> fst
-    | Load inst -> inst.opc |> fst
-    | Store inst -> inst.opc |> fst
-    | Branch inst -> inst.opc |> fst
-    | Jal inst -> inst.opc |> fst
-    | Jalr inst -> inst.opc |> fst
-    | UType inst -> inst.opc |> fst
-    | Label (s, _) -> s)
+  | Instruction instr -> instrToString instr
   | MetaBlock mb -> List.fold_left (^) "" (mb |> List.map finishedBlockToStringInternal)
 let asmToStringInternal asm =
   match asm with

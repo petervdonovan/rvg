@@ -31,8 +31,7 @@ let () =
     (let nskipped = 1 + Rvg.SideEffects.nargs in Array.sub Sys.argv nskipped (Array.length Sys.argv - nskipped)))
   with e ->
     (match e with
-    | Rvg.Ast.ParseFail (s, (p: Rvg.CharStream.position)) -> print_endline (
-      "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s)
+    | Rvg.Ast.ParseFail (s, (p: Rvg.CharStream.position)) -> printMessageRange s {startInclusive=p; endExclusive=p}
     | Rvg.Eval.EvalFail (s, r) -> printMessageRange s r
     | Rvg.Std.AssertionFail (s, r) -> printMessageRange s r
     | Rvg.Std.IllegalArgument (s, r) -> printMessageRange s r

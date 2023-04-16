@@ -7,6 +7,6 @@
     [[print s]] [[print { }]]
     [[println n]]
     true]]]
-[[string-then-num-printer {sterling}] {42}]
+[[string-then-num-printer {sterling}] 42]
 [[string-then-num-printer {sterling}] {y}]
 ]]

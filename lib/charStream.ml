@@ -73,8 +73,8 @@ let rec parseTokenRec stream startInclusive current: (string * t * range) option
     match csp with
     | Some (c, s, p) ->
       if isWhitespace c
-        then Some (current, s, {startInclusive;endExclusive = p})
-      else if List.mem c ['[';']';'(';')';'{';'}']
+        then Some (current, (cons c s), {startInclusive;endExclusive = p})
+      else if isSymbol c
         then if current = ""
           then Some (String.make 1 c, s, {startInclusive; endExclusive = p})
           else Some (current, cons c s, {startInclusive; endExclusive = incrementedCol p})

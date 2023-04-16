@@ -5,7 +5,7 @@ open Templates
 open Assembly
 let todo = ({startInclusive=CharStream.origin "TODO"; endExclusive=CharStream.origin "TODO"}: CharStream.range)
 let isEmpty fragment = fragment = ""
-let empty = Fragment ""
+(* let empty = Fragment "" *)
 let finishedBlockOf content = {
   content;
   provides = (match content with
@@ -50,35 +50,6 @@ let expectAsm r env name description =
       | _ -> raise (AsmParseFail ("Expected assembly fragment, but got assembly block", r)))
     | bad -> raise (badExprType bad)
     else failWithNoBinding name r)
-let regToString reg = match reg with
-  | TempReg (name, _) -> "temp-" ^ name
-  | SaveReg (name, _) -> "save-" ^ name
-  | Zero _ -> "Zero"
-  | Ra _ -> "Ra"
-  | Sp _ -> "Sp"
-  | Gp _ -> "Gp"
-  | Tp _ -> "Tp"
-let instrToString instr =
-  match instr with
-  | RType { opc: opcode; rd: register; rs1: register; rs2: register } ->
-    funNotation "RType" ([fst opc] @ List.map regToString [rd;rs1;rs2])
-  | IArith { opc: opcode; rd: register; rs1: register; imm: immediate } ->
-    funNotation "IArith" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
-  | Csr { opc: opcode; rd: register; rs1: register; imm: immediate } ->
-    funNotation "Csr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
-  | Load { opc: opcode; rd: register; rs1: register; imm: immediate } ->
-    funNotation "Load" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
-  | Store { opc: opcode; rs1: register; rs2: register; imm: immediate } ->
-    funNotation "Store" ([fst opc] @ List.map regToString [rs1;rs2] @ [fst imm])
-  | Branch { opc: opcode; rs1: register; rs2: register; imm: immediate } ->
-    funNotation "Branch" ([fst opc] @ List.map regToString [rs1;rs2] @ [fst imm])
-  | Jal { opc: opcode; rd: register; imm: immediate } ->
-    funNotation "Jal" ([fst opc] @ List.map regToString [rd] @ [fst imm])
-  | Jalr { opc: opcode; rd: register; rs1: register; imm: immediate } ->
-    funNotation "Jalr" ([fst opc] @ List.map regToString [rd;rs1] @ [fst imm])
-  | UType { opc: opcode; rd: register; imm: immediate } ->
-    funNotation "UType" ([fst opc] @ [regToString rd] @ [fst imm] )
-  | Label (s, noncify) -> "Label(" ^ s ^ " " ^ (string_of_bool noncify) ^ ")"
 let rec finishedBlockToString fb =
   match fb.content with
   | Instruction i -> instrToString i
@@ -251,16 +222,17 @@ let parseCsrr env opc e =
   | Some (dest, csr), e' -> Some(Instruction(Csr({
     opc="csrrs", r; rd=nameToReg env dest; rs1=Zero r; imm=resolveNumericalImm env csr
   }))), e'
-let parseRdcycle env opc s =
+let parseRdcycle env opc e =
   let _, r = opc in
-  match parseTokenExpectingString s with
-  | None, _ -> None, Some s
+  match parseTokenExpectingString e with
+  | None, _ -> None, Some e
   | Some (rd, r'), e' -> Some(Instruction(Csr({
     opc="csrrs", r'; rd=nameToReg env (rd, r'); rs1=Zero r; imm="0xb00", r
   }))), e'
 let tryParse env e =
-  match parseTokenExpectingString e with
-  | Some (opcode, r), Some e' ->
+  let makeFinishedBlock = fun o -> let o, e' = o in Option.bind o (fun v -> Some (finishedBlockOf v)), e' in
+  match parseToken e with
+  | Some (Asm opcode, meta), Some e' ->
     (let pred = NameSet.mem opcode in (
       if pred rTypeInstrs then parseR
       else if pred iTypeInstrs then parseI
@@ -290,8 +262,8 @@ let tryParse env e =
           String.uppercase_ascii opcode = opcode
         ))), Some e'
       else fun _ _ _ -> None, Some e
-    ) env (opcode, r) e')
-  | Some (opcode, r), None -> (
+    ) env (opcode, meta.r) e') |> makeFinishedBlock
+  | Some (Asm opcode, meta), None -> (
       if opcode = "nop" then parseNop
       else if opcode = "ret" then parseRet
       else if String.ends_with ~suffix:":" opcode && String.length opcode > 1
@@ -300,7 +272,9 @@ let tryParse env e =
           String.uppercase_ascii opcode = opcode
         ))), None
       else fun _ _ _ -> None, Some e
-    ) env (opcode, r) e
+    ) env (opcode, meta.r) e |> makeFinishedBlock
+  | Some (ParsedAsm (FinishedBlock fb), _), rest -> Some fb, rest
+  | Some (_, _), _ -> None, None
   | None, _ -> None, None
 let rec parse env e = parseRec env (Some e) []
   |> List.rev
@@ -308,7 +282,7 @@ let rec parse env e = parseRec env (Some e) []
 and parseRec env e acc = match e with
   | None -> acc
   | Some e -> (match tryParse env e with
-    | Some content, e' -> parseRec env e' (finishedBlockOf content :: acc)
+    | Some content, e' -> parseRec env e' (content :: acc)
     | None, None -> acc
     | None, _ -> raise (AsmParseFail ("Expected assembly in parse but got " ^ (e |> Ast.exprToString), (snd e).r)))
 let rec print pasm =

@@ -59,8 +59,10 @@ let rec exprContentToString (e: expr_content): string = match e with
   | Name s -> "Name(" ^ s ^ ")"
   | Var{ name; checks } -> funNotation "Var" (["name=" ^ name] @ (checks |> List.map fst |> List.map exprToString))
   | Asm s -> "Asm(" ^ s ^ ")"
+  | ParsedAsm (FinishedBlock asm) ->
+      funNotation "ParsedAsmF" [Assembly.asmToStringInternal (FinishedBlock asm)]
   | ParsedAsm asm ->
-      funNotation "ParsedAsm" [Assembly.asmToStringInternal asm]
+    funNotation "ParsedAsm" [Assembly.asmToStringInternal asm]
   | Template (exprs, _) -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
   | Lam la -> lamMuToString la
   | LamApplication { lam; args } -> "LamApplication(lam=" ^

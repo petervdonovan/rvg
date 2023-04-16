@@ -76,7 +76,7 @@
   alphabet soup bishop
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg 14.rvg
   sterling 42
-  y: [14.rvg] line 14, col 39 to line 14, col 42
+  y: [14.rvg] line 11, col 39 to line 11, col 42
   Expected a number: [rvg-stdlib/stdlib.rvg] line 21, col 19 to line 21, col 46
   [rvg-stdlib/stdlib.rvg] line 7, col 4 to line 7, col 13: Assertion failed
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg rvg-stdlib/ctrl.rvg 15.rvg
