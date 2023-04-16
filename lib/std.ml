@@ -188,8 +188,11 @@ let getFinishedBlock arg currentEnv r = (
   AssemblyParse.parse (AssemblyParse.expectAsm r currentEnv) arg)
 let assertBlock args _ _ _ currentEnv _ r =
   assertExactlyNArgs 1 args r;
-  let fb, meta = getFinishedBlock (List.hd args) currentEnv r in
-  Ast.ParsedAsm (Assembly.FinishedBlock fb), meta
+  let arg = List.hd args in
+  match arg with
+  | Ast.ParsedAsm (Assembly.FinishedBlock _), _ -> arg
+  | _ -> let fb, meta = getFinishedBlock (List.hd args) currentEnv r in
+    Ast.ParsedAsm (Assembly.FinishedBlock fb), meta
 (* let getFinishedBlock arg currentEnv r =
   let fb, metadata = parseFinishedBlockRec arg currentEnv r in
   match fb with
@@ -200,7 +203,7 @@ let exactCycles args _ _ _ currentEnv _ r =
   let asmexpr = args |> List.hd in
   let asmtem', metadata = getFinishedBlock asmexpr currentEnv r in
     let _, k = getCycles r asmtem' in
-      Ast.ParsedAsm (Assembly.Fragment (string_of_int k)), metadata
+      Ast.Integer k, metadata
 let safeAssertKCycles args _ _ closure currentEnv _ r =
   assertExactlyNArgs 1 args r;
   let k, _ = args |> List.hd |> getNumericalArg r in
