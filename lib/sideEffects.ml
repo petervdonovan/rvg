@@ -61,7 +61,7 @@ let reportResolvedName range expr =
         | Ast.ParsedAsm (Assembly.FinishedBlock (
             {totalCycles=Some k; _}: Assembly.finished_block)
           ) -> string_of_int k
-        | _ -> ParseUtil.debug_print "cycles of ? =" (content |> Ast.exprContentToString); "null") ^ {|, "cyclesMod": [|} ^ (match content with
+        | _ -> "null") ^ {|, "cyclesMod": [|} ^ (match content with
         | Ast.ParsedAsm (Assembly.FinishedBlock (
             {cyclesMod; _}: Assembly.finished_block)
           ) -> Assembly.CyclesModMap.bindings cyclesMod |> List.map (fun (m, x) -> (string_of_int x) ^ " mod " ^ (string_of_int m)) |> String.concat ", "

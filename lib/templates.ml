@@ -29,7 +29,9 @@ let rec parseToken e = let e', meta = e in
           | Some (Asm rest, meta'') ->
               Some (Asm (token ^ rest), { attrs = Attributes.union meta''.attrs meta'.attrs; r = meta'.r }), remainder'
           | _ -> Some (Asm token, meta'), Some remainder)))
-    | Some _ -> token, remainder
+    | Some _ -> token, (match remainder with
+      | Some remainder -> Some (Template (remainder :: tail, env), meta)
+      | None -> Some (Template (tail, env), meta))
     | None -> parseToken (Template (List.tl exprs, env), meta))
   | Asm _ -> let s = asm2CharStream e in
     (match CharStream.parseToken s with

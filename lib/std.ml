@@ -10,7 +10,7 @@ let rec unconditionalPrint arg = match arg with
   | Ast.Asm asm, _ -> print_string asm;
   | Ast.Integer i, _ -> print_int i;
   | _ -> print_string (Ast.exprToString arg)
-let print arg =
+let conditionalPrint arg =
   if SideEffects.sideEffectsAllowed then unconditionalPrint arg; arg
 
 let assertNArgs pred description args r: unit =
@@ -53,7 +53,7 @@ let print args _ _ closure _ _ r = (
   assertExactlyNArgs 1 args r;
   let arg = List.hd args in
   addattrInternal "print" (emptyLam 0 r closure (fun _ _ _ _ _ _ _ ->
-  print arg))
+  conditionalPrint arg))
 )
 let fail args _ _ closure _ _ r = (
   assertAtLeastNArgs 1 args r;
@@ -339,4 +339,4 @@ let%expect_test _ = (try Eval.printReducedAst stdFun std {|
       }]
   |} with
     | AssertionFail (s, r) -> print_endline s; print_endline (CharStream.rangeToString r));
-  [%expect{| E(ParsedAsm(Fragment(3)), ) |}]
+  [%expect{| E(3, ) |}]
