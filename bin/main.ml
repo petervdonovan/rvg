@@ -37,5 +37,5 @@ let () =
     | Rvg.Std.AssertionFail (s, r) -> printMessageRange s r
     | Rvg.Std.IllegalArgument (s, r) -> printMessageRange s r
     | Rvg.Std.WrongNumberOfArgs (s, r) -> printMessageRange s r
-    | Rvg.Assembly.AsmParseFail (s, r) -> printMessageRange s r
+    | Rvg.AssemblyParse.AsmParseFail (s, r) -> printMessageRange s r
     | _ -> raise e)

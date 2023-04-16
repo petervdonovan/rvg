@@ -16,7 +16,7 @@ let rec evalExpr env e = match e with
   | Ast.Asm _, _ -> e, env
   | Ast.Template (tem, prevEnv), meta ->
     let exprs', env' = evalExprListInOrder env (List.rev tem) in
-    let exprs' = List.rev exprs' in (* FIXME: inefficient to double rev? *)
+    let exprs' = mergeExprs exprs' in (* FIXME: inefficient to double rev? *)
     let tem = (Ast.Template (exprs', if Environment.is_empty prevEnv then env else prevEnv), meta) in
     tem, env'
   | Ast.Lam {params; lbody; env = prevEnv; f }, meta -> (
@@ -44,22 +44,6 @@ and evalSequence r env exprList =
   let exprs', _ = evalExprListInOrder env exprList in
   let head = List.hd exprs' in
   head
-and expectAsm r env name description =
-  let badExprType bad = (Assembly.AsmParseFail (
-    description ^ " expected, but found expression " ^ Ast.exprToString bad, (snd bad).r)) in
-  (if Environment.mem name env
-    then let e, _ = evalExpr env (Environment.find name env) in
-    match e with
-    | (Ast.Integer i, meta) -> string_of_int i, meta.r
-    | (Ast.Template tem, meta) -> (match Ast.unwrap (Ast.Template tem) with
-      | Some good -> good, meta.r
-      | None -> raise (badExprType e))
-    | (Ast.Asm num, meta) -> num, meta.r
-    | (Ast.ParsedAsm pasm, _) -> (match pasm with
-      | Fragment f -> f, r
-      | _ -> raise (Assembly.AsmParseFail ("Expected assembly fragment, but got assembly block", r)))
-    | bad -> raise (badExprType bad)
-    else Assembly.failWithNoBinding name r)
 and bindNames env params args r =
   let nparams = List.length params in
   let nargs = List.length args in
@@ -75,6 +59,17 @@ and applyChecks env (param: Ast.var) arg =
   List.fold_left (fun (arg, env') (check, meta) ->
     evalExpr env' (LamApplication {lam=check; args=[arg]}, meta)
   ) (arg, env) param.checks
+and mergeExprs es =
+  List.fold_left (fun acc e -> match e with
+  | Ast.Asm s, (meta: Ast.metadata) -> if List.length acc = 0 then [e] else (match List.hd acc with
+    | Ast.Asm s', (meta': Ast.metadata) -> (
+      Ast.Asm (s ^ s'), {
+        attrs = Ast.Attributes.union meta.attrs meta'.attrs;
+        r = ({startInclusive = meta.r.startInclusive; endExclusive = meta'.r.endExclusive}: CharStream.range)
+      }) :: (List.tl acc)
+    | _ -> e :: acc)
+  | Ast.Integer i, meta -> (Ast.Asm (string_of_int i), meta) :: acc
+  | _ -> e :: acc) [] es
 let lam args params lbody closure _ evalSequence r =
   let bound = bindNames closure (List.map fst params) args r in
     evalSequence bound lbody
@@ -110,8 +105,8 @@ let%expect_test _ =
 let printReducedAst stdFun std text =
   text |> Ast.getAst stdFun |> evalExpr std |> fst |> Ast.exprToString
   |> print_endline
-let printEndingAsm text =
-  text |> Ast.getAst testStd |> evalExpr Environment.empty |> fst |> fun x -> match x with | ParsedAsm pasm, _ -> Assembly.print pasm | _ -> print_endline "did not evaluate to ParsedAsm"
+(* let printEndingAsm text =
+  text |> Ast.getAst testStd |> evalExpr Environment.empty |> fst |> fun x -> match x with | ParsedAsm pasm, _ -> Assembly.print pasm | _ -> print_endline "did not evaluate to ParsedAsm" *)
 
 let%expect_test _ = printReducedAst testStd Environment.empty "[lam [] \"\" ]";
   [%expect{| E(Lam(params=[], lbody=E(Name(""), )), ) |}]

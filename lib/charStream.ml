@@ -56,10 +56,12 @@ let peek s = match uncons s with | Some (c, s') -> Some (c), cons c s' | None ->
 let rec takeWhileRec pred acc r s =
   match unconsp s with
   | Some (c, s', p) -> if pred c
-    then takeWhileRec pred (c :: acc) {startInclusive=r.startInclusive; endExclusive=s'.current} s'
+    then (Buffer.add_char acc c; takeWhileRec pred acc {startInclusive=r.startInclusive; endExclusive=s'.current} s')
     else acc, {startInclusive=p; endExclusive=p}, (cons c s')
   | None -> acc, r, s
-let takeWhile pred s = takeWhileRec pred [] (singleCharRange s.current) s
+let takeWhile pred s =
+  let buf, r, s = takeWhileRec pred (Buffer.create 16) (singleCharRange s.current) s in
+  (Buffer.contents buf), r, s
 
 let rec consumeWhitespace (stream: t) =
   let csp = unconsp stream in

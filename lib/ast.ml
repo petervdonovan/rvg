@@ -60,7 +60,7 @@ let rec exprContentToString (e: expr_content): string = match e with
   | Var{ name; checks } -> funNotation "Var" (["name=" ^ name] @ (checks |> List.map fst |> List.map exprToString))
   | Asm s -> "Asm(" ^ s ^ ")"
   | ParsedAsm asm ->
-      funNotation "ParsedAsm" [Assembly.asmToString asm]
+      funNotation "ParsedAsm" [Assembly.asmToStringInternal asm]
   | Template (exprs, _) -> "Template(" ^ List.fold_left (^) "" (List.map exprToString exprs) ^ ")"
   | Lam la -> lamMuToString la
   | LamApplication { lam; args } -> "LamApplication(lam=" ^
@@ -143,10 +143,7 @@ and parseTemplate std startInclusive stream: template * CharStream.range * CharS
     (tem, Environment.empty), {startInclusive=startInclusive; endExclusive=s.current}, s
 and parseAsm marker stream =
   let pred = fun c -> not (List.mem c ['}';'[']) in
-  let asm, r, s = CharStream.takeWhile pred stream in
-  let b = Buffer.create 16 in
-  asm |> List.rev |> List.iter (Buffer.add_char b);
-  let contents = Buffer.contents b in
+  let contents, r, s = CharStream.takeWhile pred stream in
   if contents = "" then contents, metaInitial r, s else if String.ends_with ~suffix:marker contents then (String.sub contents 0 ((String.length contents) - (String.length marker)), metaInitial r, s) else
   match CharStream.uncons s with
   | Some (c, s') -> let rest, r', s'' = parseAsm marker s' in
@@ -202,8 +199,8 @@ and parseVarList std startInclusive accumulator stream =
     parseVarList std startInclusive (v :: accumulator) s'
   | Some (x, _, p) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x, p))
   | None -> raise (ParseFail ("Expected ']' or '(', not end-of-file", (stream: CharStream.t).current))
-let thisIsUnevaluatedOrNotAssembly description e =
-  raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly", (snd e).r))
+(* let thisIsUnevaluatedOrNotAssembly description e =
+  raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly", (snd e).r)) *)
 let rec unwrap e = match e with
   | Template (tem, _) -> if List.length tem = 1 then tem |> List.hd |> fst |> unwrap else None
   | Asm s -> Some s
