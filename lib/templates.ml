@@ -4,7 +4,7 @@ let asm2CharStream asm =
   let asm, meta = asm in
   match asm with
   | Asm asm -> ({s = String.to_seq asm; current = meta.r.startInclusive; previous = None; file = meta.r.startInclusive.file}: CharStream.t)
-  | _ -> raise (ParseFail ("Expected assembly", meta.r.startInclusive))
+  | _ -> raise (ParseFail ("Expected assembly but got " ^ (asm |> exprContentToString), meta.r.startInclusive))
 let charStream2asm (s: CharStream.t) attrs =
   let asm, r, _ = CharStream.takeWhile (fun _ -> true) s in
   if asm = "" then None else Some (Asm asm, {attrs; r})

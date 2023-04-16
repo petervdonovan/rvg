@@ -301,7 +301,7 @@ let tryParse env e =
         ))), None
       else fun _ _ _ -> None, Some e
     ) env (opcode, r) e
-  | None, _ -> None, Some e
+  | None, _ -> None, None
 let rec parse env e = parseRec env (Some e) []
   |> List.rev
   |> fun it -> finishedBlockOf (MetaBlock it), snd e
@@ -309,7 +309,8 @@ and parseRec env e acc = match e with
   | None -> acc
   | Some e -> (match tryParse env e with
     | Some content, e' -> parseRec env e' (finishedBlockOf content :: acc)
-    | None, _ -> raise (AsmParseFail ("Expected assembly", (snd e).r)))
+    | None, None -> acc
+    | None, _ -> raise (AsmParseFail ("Expected assembly in parse but got " ^ (e |> Ast.exprToString), (snd e).r)))
 let rec print pasm =
   match pasm with
   | Fragment f -> print_string f

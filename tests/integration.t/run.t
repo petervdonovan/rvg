@@ -99,7 +99,7 @@
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg 17.rvg
   hello:
   HELLO_tJ6slU7Skn:
-  Hello_vWRvZ2Pn4y:
+  Hello:
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg "18.0.rvg=[mu[] [[lam [(x)] [;; {21}] [[print {[id x] [id x]}]]] {hello}]]" "18.1.rvg=[stdlib 18.0]"
   hello hello
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg rvg-stdlib/ctrl.rvg 19.rvg

@@ -2,7 +2,7 @@
 [;; {| this is a long
 |[true {} {}] long
 docstring.|}]
-[[print {hello:}]]
-[[print {HELLO:}]]
-[[print {| Hello: |}]]
+[[print [block! {hello:}]]]
+[[print [block! {HELLO:}]]]
+[[print [block! {| Hello: |}]]]
 ]]

@@ -252,8 +252,7 @@ let foldRange args _ _ closure _ _ r =
         ((Seq.unfold (fun (current, n) ->
           if n = count then None
           else Some (current, (current + step, n + 1))) (start, 0))
-          |> Seq.map (fun x ->
-            Ast.ParsedAsm (Assembly.Fragment (string_of_int x)), Ast.metaInitial r))
+          |> Seq.map (fun x -> Ast.Integer x, Ast.metaInitial r))
     ))
   )))
 let applierifyVarargs args _ _ closure _ _ r =

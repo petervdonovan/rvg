@@ -1,9 +1,9 @@
 [stdlib [mu [] [ctrl [mu []
-[[print {
+[[print [block! {
 hello:
     start:
     li t0 0xbaaabaaa
     csrw 0x51e t0
     csrw 0x51e a0
     jalr zero ra 0
-}]]]]]]
+}]]]]]]]

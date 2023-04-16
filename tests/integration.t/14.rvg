@@ -1,11 +1,8 @@
 [stdlib [mu []
 [def (
     string-then-num-printer
-    [->
-        [lamof frag!]
-        [->
-        [lamof num!]
-        bool!]])
+    [lamof frag!]
+    [-> [∘ [lamof num!] [-> bool!]]])
   [lam [(s)] [lam [(n)]
     [[print s]] [[print { }]]
     [[println n]]
