@@ -201,28 +201,10 @@ and parseVarList std startInclusive accumulator stream =
     parseVarList std startInclusive (v :: accumulator) s'
   | Some (x, _, p) -> raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x, p))
   | None -> raise (ParseFail ("Expected ']' or '(', not end-of-file", (stream: CharStream.t).current))
-(* let thisIsUnevaluatedOrNotAssembly description e =
-  raise (Assembly.AsmParseFail ("Attempted to parse " ^ description ^ " " ^ exprToString e ^ " as assembly", (snd e).r)) *)
 let rec unwrap e = match e with
   | Template (tem, _) -> if List.length tem = 1 then tem |> List.hd |> fst |> unwrap else None
   | Asm s -> Some s
   | _ -> None
-(* let rec exprToParsedAsm env e =
-  let content, meta = e in
-  match content with
-  | Name _ -> thisIsUnevaluatedOrNotAssembly "unbound name" e
-  | Var _ -> thisIsUnevaluatedOrNotAssembly "variable declaration" e
-  | Asm s -> Assembly.parse Assembly.empty env s, meta
-  | ParsedAsm a -> a, meta
-  | Template tem -> (tem
-    |> List.map (exprToParsedAsm env)
-    |> List.map fst
-    |> List.rev (* FIXME: Performance issue? *)
-    |> List.fold_left (Assembly.prependBlock env) {top=""; middle = []; bottom = ""}
-    |> Assembly.promoteOrDemote env, meta)
-  | Lam _ -> thisIsUnevaluatedOrNotAssembly "lam" e
-  | LamApplication _ -> thisIsUnevaluatedOrNotAssembly "unevaluated lam application" e
-  | Def _ -> thisIsUnevaluatedOrNotAssembly "def" e *)
 let handleParseFail runnable = try runnable () with e -> match e with
   | ParseFail (s, (p: CharStream.position)) -> print_endline (
     "Line " ^ (string_of_int (p.zeroBasedLine + 1)) ^ ", col " ^ (string_of_int (p.zeroBasedCol + 1)) ^ ": " ^ s); raise e

@@ -5,7 +5,6 @@ open Templates
 open Assembly
 let todo = ({startInclusive=CharStream.origin "TODO"; endExclusive=CharStream.origin "TODO"}: CharStream.range)
 let isEmpty fragment = fragment = ""
-(* let empty = Fragment "" *)
 let finishedBlockOf content = {
   content;
   provides = (match content with
