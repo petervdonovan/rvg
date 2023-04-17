@@ -35,7 +35,6 @@
   Expected a number: [rvg-stdlib/stdlib.rvg] line 21, col 19 to line 21, col 46
   [rvg-stdlib/stdlib.rvg] line 7, col 4 to line 7, col 13: Assertion failed
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg 7.rvg
-  ok 23
   ok nop
   ok addi
   ok nasty

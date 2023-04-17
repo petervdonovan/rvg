@@ -1,10 +1,8 @@
 [stdlib [mu []
-[if [frag? 23] [print {ok 23
+[if [frag? {nop}] [print {ok nop
 }] [print {failed}]]
-[if [frag? {nop}] [print {failed}] [print {ok nop
+[if [block? {addi zero zero 1}] [print {failed}] [print {ok addi
 }]]
-[if [block? {addi zero zero 1}] [print {ok addi
-}] [print {failed}]]
 [if [block? {nasty}] [print {failed}] [print {ok nasty
 }]]
 [if [reg? {t0}] [print {ok t0
