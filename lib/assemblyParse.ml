@@ -87,8 +87,6 @@ let resolveLabel label =
   if not (Eval.Environment.mem l env) then l, r else match evalToString env l r with
   | Some (l', _), _ -> l'
   | None, _ -> raise (AsmParseFail ("expected label but got nothing", r))
-    (* | (Asm l, meta'), _ -> l, meta'.r
-    | e, _ -> raise (AsmParseFail ("expected label, not " ^ (e |> Ast.exprToString), r))) else l, r *)
 let asmParseFail formatDescription e r =
   raise (AsmParseFail ("Instruction \"" ^ (Ast.exprToString e) ^ "\" does not follow the instruction syntax for " ^ formatDescription, r))
 let parseR env opc e =
@@ -279,16 +277,6 @@ let tryParse env e =
         ))), e'
       else fun _ _ _ -> None, Some e
     ) env (opcode, meta.r) e'') |> makeFinishedBlock
-  (* | Some (Asm opcode, meta) -> (
-      if opcode = "nop" then parseNop
-      else if opcode = "ret" then parseRet
-      else if String.ends_with ~suffix:":" opcode && String.length opcode > 1
-        then fun _ _ _ -> Some (Instruction(Label (
-          String.sub opcode 0 (String.length opcode - 1),
-          String.uppercase_ascii opcode = opcode
-        ))), None
-      else fun _ _ _ -> None, Some e
-    ) env (opcode, meta.r) e |> makeFinishedBlock *)
   | Some (ParsedAsm (FinishedBlock fb), _) -> Some fb, e'
   | Some (_, _) -> None, None
   | None -> None, None
