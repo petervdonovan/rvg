@@ -1,6 +1,6 @@
 [stdlib [mu [] [ctrl [mu [] [single-threaded [mu []
 [def (mycondition) [< {zero} {t0}]]
-[[print [branch3
+[[print [block! [branch3
   mycondition
-  {lw t1 0(t0)}]]]
+  {lw t1 0(t0)}]]]]
 ]]]]]]

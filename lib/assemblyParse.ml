@@ -60,6 +60,9 @@ let rec asmToString asm =
   | Block {top; middle; bottom} -> funNotation "Block"
     [top; asmToString (FinishedBlock (finishedBlockOf (MetaBlock middle))); bottom]
   | FinishedBlock fb -> finishedBlockToString fb
+let evalToString env str r =
+  let e, _ = Eval.evalExpr env (Ast.Name str, Ast.metaInitial r) in
+  parseTokenExpectingString env e
 let rec nameToReg name =
   let (str, r), env = name in
   if NameSet.mem str temporaries then TempReg (str, r)
@@ -69,19 +72,23 @@ let rec nameToReg name =
   else if str = "sp" then Sp r
   else if str = "gp" then Gp r
   else if str = "tp" then Tp r
-  else match Eval.evalExpr env (Ast.Name str, Ast.metaInitial r) with
-    | (Ast.Asm s, meta), env' -> nameToReg ((s, meta.r), env')
-    | _ -> raise (AsmParseFail ("expected register, not " ^ str, r))
+  else match evalToString env str r with
+  | Some name', _ -> nameToReg name'
+  | None, _ -> raise (AsmParseFail ("expected register but got nothing", r))
 let resolveNumericalImm imm =
   let (s, r), env = imm in
   match s |> int_of_string_opt with
   | Some _ -> s, r
   | None -> match Eval.evalExpr env (Ast.Name s, Ast.metaInitial r) with
     | (Ast.Integer i, _), _ -> i |> string_of_int, r
-    | _ -> raise (AsmParseFail ("expected number, not " ^ s, r))
+    | e, _ -> raise (AsmParseFail ("expected number, not " ^ (e |> Ast.exprToString), r))
 let resolveLabel label =
   let (l, r), env = label in
-  if Eval.Environment.mem l env then (match Eval.evalExpr env (Ast.Name l, Ast.metaInitial r) with | (Asm l, meta'), _ -> l, meta'.r | _ -> raise (AsmParseFail ("expected label, not " ^ l, r))) else l, r
+  if not (Eval.Environment.mem l env) then l, r else match evalToString env l r with
+  | Some (l', _), _ -> l'
+  | None, _ -> raise (AsmParseFail ("expected label but got nothing", r))
+    (* | (Asm l, meta'), _ -> l, meta'.r
+    | e, _ -> raise (AsmParseFail ("expected label, not " ^ (e |> Ast.exprToString), r))) else l, r *)
 let asmParseFail formatDescription e r =
   raise (AsmParseFail ("Instruction \"" ^ (Ast.exprToString e) ^ "\" does not follow the instruction syntax for " ^ formatDescription, r))
 let parseR env opc e =
