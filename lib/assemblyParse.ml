@@ -60,8 +60,8 @@ let rec asmToString asm =
   | Block {top; middle; bottom} -> funNotation "Block"
     [top; asmToString (FinishedBlock (finishedBlockOf (MetaBlock middle))); bottom]
   | FinishedBlock fb -> finishedBlockToString fb
-let rec nameToReg env name =
-  let str, r = name in
+let rec nameToReg name =
+  let (str, r), env = name in
   if NameSet.mem str temporaries then TempReg (str, r)
   else if NameSet.mem str saved then SaveReg (str, r)
   else if str = "zero" then Zero r
@@ -69,121 +69,125 @@ let rec nameToReg env name =
   else if str = "sp" then Sp r
   else if str = "gp" then Gp r
   else if str = "tp" then Tp r
-  else nameToReg env (env str "Register name")
-let resolveNumericalImm env imm =
-  let s, _ = imm in
+  else match Eval.evalExpr env (Ast.Name str, Ast.metaInitial r) with
+    | (Ast.Asm s, meta), env' -> nameToReg ((s, meta.r), env')
+    | _ -> raise (AsmParseFail ("expected register, not " ^ str, r))
+let resolveNumericalImm imm =
+  let (s, r), env = imm in
   match s |> int_of_string_opt with
-  | Some _ -> imm
-  | None -> env s "Numerical immediate"
-let resolveLabel env (label: string * CharStream.range) =
-  let l, _ = label in
-  try env l "Label" with AsmParseFail _ -> label
+  | Some _ -> s, r
+  | None -> match Eval.evalExpr env (Ast.Name s, Ast.metaInitial r) with
+    | (Ast.Integer i, _), _ -> i |> string_of_int, r
+    | _ -> raise (AsmParseFail ("expected number, not " ^ s, r))
+let resolveLabel label =
+  let (l, r), env = label in
+  if Eval.Environment.mem l env then (match Eval.evalExpr env (Ast.Name l, Ast.metaInitial r) with | (Asm l, meta'), _ -> l, meta'.r | _ -> raise (AsmParseFail ("expected label, not " ^ l, r))) else l, r
 let asmParseFail formatDescription e r =
   raise (AsmParseFail ("Instruction \"" ^ (Ast.exprToString e) ^ "\" does not follow the instruction syntax for " ^ formatDescription, r))
 let parseR env opc e =
-  match get3Tokens e with
-  | Some (rd, rs1, rs2), e' -> Some (Instruction(RType { opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2 })), e'
+  match get3Tokens env e with
+  | Some (rd, rs1, rs2), e' -> Some (Instruction(RType { opc = opc; rd = nameToReg rd; rs1 = nameToReg rs1; rs2 = nameToReg rs2 })), e'
   | None, _ -> None, Some e
 let parseI env opc e =
-    match get3Tokens e with
+    match get3Tokens env e with
     | Some (rd, rs1, imm), e' -> Some (Instruction(IArith {
-      opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1;
-      imm = resolveNumericalImm env imm
+      opc = opc; rd = nameToReg rd; rs1 = nameToReg rs1;
+      imm = resolveNumericalImm imm
     })), e'
     | None, _ -> None, Some e
 let parseLoad env opc e =
-  match get3TokensWithThirdTokenInParens e with
+  match get3TokensWithThirdTokenInParens env e with
   | Some (rd, imm, rs1), e' -> Some (Instruction(Load {
-    opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1;
-    imm = resolveNumericalImm env imm
+    opc = opc; rd = nameToReg rd; rs1 = nameToReg rs1;
+    imm = resolveNumericalImm imm
   })), e'
   | None, _ -> None, Some e
 let parseStore env opc e =
-  match get3TokensWithThirdTokenInParens e with
+  match get3TokensWithThirdTokenInParens env e with
   | Some (rs2, imm, rs1), e' -> Some (Instruction(Store {
-    opc = opc; rs2 = nameToReg env rs2; rs1 = nameToReg env rs1;
-    imm = resolveNumericalImm env imm
+    opc = opc; rs2 = nameToReg rs2; rs1 = nameToReg rs1;
+    imm = resolveNumericalImm imm
   })), e'
   | None, _ -> None, Some e
 let parseBranch env opc e =
-  match get3Tokens e with
+  match get3Tokens env e with
   | Some (rs1, rs2, label), e' -> Some (Instruction(Branch {
-    opc = opc; rs1 = nameToReg env rs1; rs2 = nameToReg env rs2;
-    imm = resolveLabel env label
+    opc = opc; rs1 = nameToReg rs1; rs2 = nameToReg rs2;
+    imm = resolveLabel label
   })), e'
   | None, _ -> None, Some e
 let parseJal env opc e =
-  match get2Tokens e with
-  | Some (rd, label), e' -> Some (Instruction(Jal { opc = opc; rd = nameToReg env rd; imm = resolveLabel env label })), e'
+  match get2Tokens env e with
+  | Some (rd, label), e' -> Some (Instruction(Jal { opc = opc; rd = nameToReg rd; imm = resolveLabel label })), e'
   | None, _ -> None, Some e
 let parseJalr env opc e =
-  match get3Tokens e with
+  match get3Tokens env e with
   | Some (rd, rs1, imm), e' -> Some (Instruction(Jalr {
-    opc = opc; rd = nameToReg env rd; rs1 = nameToReg env rs1; imm = resolveNumericalImm env imm
+    opc = opc; rd = nameToReg rd; rs1 = nameToReg rs1; imm = resolveNumericalImm imm
   })), e'
   | None, _ -> None, Some e
 let parseU env opc e =
-  match get2Tokens e with
-  | Some (rd, imm), e' -> Some (Instruction(UType { opc = opc; rd = nameToReg env rd; imm })), e'
+  match get2Tokens env e with
+  | Some (rd, imm), e' -> Some (Instruction(UType { opc = opc; rd = nameToReg rd; imm = fst imm })), e'
   | None, _ -> None, Some e
 let parseBxxz env opc e = (
   let opcs, r = opc in
-  match get2Tokens e with
+  match get2Tokens env e with
   | Some (rs1, label), e' -> Some (Instruction(Branch {
       opc = if opcs = "beqz" then "beq", r else "bne", r;
-      rs1 = nameToReg env rs1;
+      rs1 = nameToReg rs1;
       rs2=Zero r;
-      imm=resolveLabel env label
+      imm=resolveLabel label
     })), e'
   | None, _ -> None, Some e)
 let parseJ env opc e =
   let _, r = opc in
-  match parseTokenExpectingString e with
+  match parseTokenExpectingString env e with
   | Some (label, r'), e' -> Some (Instruction(Jal {
     opc = "jal", r;
     rd = Zero r;
-    imm = resolveLabel env (label, r')
+    imm = resolveLabel (label, r')
   })), e'
   | None, _ -> None, Some e
 let parseJr env opc e =
   let _, r = opc in
-  match parseTokenExpectingString e with
+  match parseTokenExpectingString env e with
   | Some (rs1s, r'), e' -> Some (Instruction(Jalr {
     opc = "jalr", r;
     rd = Zero r;
-    rs1 = nameToReg env (rs1s, r');
+    rs1 = nameToReg (rs1s, r');
     imm = "0", r
   })), e'
   | None, _ -> None, Some e
 let parseLa _ opc _ = raise (AsmParseFail ("la is not currently supported", snd opc))
 let parseLi env opc e =
   let _, r = opc in
-  match get2Tokens e with
-  | Some (rd, (imm, immr)), e' -> (
-    let ks, _ = resolveNumericalImm env (imm, immr) in
+  match get2Tokens env e with
+  | Some (rd, ((imm, immr), env')), e' -> (
+    let ks, _ = resolveNumericalImm ((imm, immr), env') in
     let k = int_of_string ks in
     let upper = k / 4096 in
     let lower = k - 4096 * upper in
     let lower = if lower > 2047 then lower - 4096 else lower in
     let upper = (k - lower) / 4096 in
-    let rd = nameToReg env rd in
+    let rd = nameToReg rd in
     Some (MetaBlock (
       (if upper = 0 then [] else [finishedBlockOf (Instruction(UType {opc="lui", r; rd; imm=string_of_int upper, immr}))])
       @ (if lower = 0 && upper <> 0 then [] else [finishedBlockOf (Instruction(IArith {opc="addi", r; rd; rs1 = (if upper = 0 then Zero r else rd); imm=string_of_int lower, immr}))]))), e')
   | None, _ -> None, Some e
 let parseMv env opc e =
   let _, r = opc in
-  match get2Tokens e with
+  match get2Tokens env e with
   | None, _ -> None, Some e
   | Some (rd, rs1), e' -> Some (Instruction(IArith({
-    opc="addi", r; rd=nameToReg env rd; rs1 = nameToReg env rs1; imm="0", r
+    opc="addi", r; rd=nameToReg rd; rs1 = nameToReg rs1; imm="0", r
   }))), e'
 let parseNeg env opc e =
   let _, r = opc in
-  match get2Tokens e with
+  match get2Tokens env e with
   | None, _ -> None, Some e
   | Some (rd, rs1), e' -> Some (Instruction(RType({
-    opc="sub", r; rd=nameToReg env rd; rs1 = nameToReg env rs1; rs2=Zero r
+    opc="sub", r; rd=nameToReg rd; rs1 = nameToReg rs1; rs2=Zero r
   }))), e'
 let parseNop _ opc e =
   let _, r = opc in Some(Instruction(IArith({
@@ -191,10 +195,10 @@ let parseNop _ opc e =
   }))), Some e
 let parseNot env opc s =
   let _, r = opc in
-  match get2Tokens s with
+  match get2Tokens env s with
   | None, _ -> None, Some s
   | Some (rd, rs1), e' -> Some (Instruction(IArith({
-    opc="xori", r; rd=nameToReg env rd; rs1 =nameToReg env rs1; imm="-1", r
+    opc="xori", r; rd=nameToReg rd; rs1 =nameToReg rs1; imm="-1", r
   }))), e'
 let parseRet _ opc e =
   let _, r = opc in Some(Instruction(Jalr({
@@ -202,36 +206,42 @@ let parseRet _ opc e =
   }))), Some e
 let parseCsrInstr env opc e =
   let opc, r = opc in
-  match get3Tokens e with
+  match get3Tokens env e with
   | None, _ -> None, Some e
   | Some (rd, csr, rs1), e' -> Some(Instruction(Csr({
-    opc=opc, r; rd=nameToReg env rd; rs1=nameToReg env rs1; imm=resolveNumericalImm env csr
+    opc=opc, r; rd=nameToReg rd; rs1=nameToReg rs1; imm=resolveNumericalImm csr
   }))), e'
 let parseCsrw env opc e =
   let _, r = opc in
-  match get2Tokens e with
+  match get2Tokens env e with
   | None, _ -> None, Some e
   | Some (csr, source), e' -> Some(Instruction(Csr({
-    opc="csrrw", r; rd=Zero r; rs1=nameToReg env source; imm=resolveNumericalImm env csr
+    opc="csrrw", r; rd=Zero r; rs1=nameToReg source; imm=resolveNumericalImm csr
   }))), e'
 let parseCsrr env opc e =
   let _, r = opc in
-  match get2Tokens e with
+  match get2Tokens env e with
   | None, _ -> None, Some e
   | Some (dest, csr), e' -> Some(Instruction(Csr({
-    opc="csrrs", r; rd=nameToReg env dest; rs1=Zero r; imm=resolveNumericalImm env csr
+    opc="csrrs", r; rd=nameToReg dest; rs1=Zero r; imm=resolveNumericalImm csr
   }))), e'
 let parseRdcycle env opc e =
   let _, r = opc in
-  match parseTokenExpectingString e with
+  match parseTokenExpectingString env e with
   | None, _ -> None, Some e
-  | Some (rd, r'), e' -> Some(Instruction(Csr({
-    opc="csrrs", r'; rd=nameToReg env (rd, r'); rs1=Zero r; imm="0xb00", r
+  | Some ((rd, r'), env'), e' -> Some(Instruction(Csr({
+    opc="csrrs", r'; rd=nameToReg ((rd, r'), env'); rs1=Zero r; imm="0xb00", r
   }))), e'
 let tryParse env e =
-  let makeFinishedBlock = fun o -> let o, e' = o in Option.bind o (fun v -> Some (finishedBlockOf v)), e' in
-  match parseToken e with
-  | Some (Asm opcode, meta), Some e' ->
+  let makeFinishedBlock = fun o ->
+    let o, e' = o in
+    Option.bind o (fun v -> Some (finishedBlockOf v)), e'
+  in
+  let opcode, env', e' = parseToken e in
+  let env = Option.value env' ~default: env in
+  let e'' = Option.value e' ~default: (Ast.Asm "", Ast.metaEmpty) in
+  match opcode with
+  | Some (Asm opcode, meta) ->
     (let pred = NameSet.mem opcode in (
       if pred rTypeInstrs then parseR
       else if pred iTypeInstrs then parseI
@@ -259,10 +269,10 @@ let tryParse env e =
         then fun _ _ _ -> Some (Instruction(Label (
           String.sub opcode 0 (String.length opcode - 1),
           String.uppercase_ascii opcode = opcode
-        ))), Some e'
+        ))), e'
       else fun _ _ _ -> None, Some e
-    ) env (opcode, meta.r) e') |> makeFinishedBlock
-  | Some (Asm opcode, meta), None -> (
+    ) env (opcode, meta.r) e'') |> makeFinishedBlock
+  (* | Some (Asm opcode, meta) -> (
       if opcode = "nop" then parseNop
       else if opcode = "ret" then parseRet
       else if String.ends_with ~suffix:":" opcode && String.length opcode > 1
@@ -271,10 +281,10 @@ let tryParse env e =
           String.uppercase_ascii opcode = opcode
         ))), None
       else fun _ _ _ -> None, Some e
-    ) env (opcode, meta.r) e |> makeFinishedBlock
-  | Some (ParsedAsm (FinishedBlock fb), _), rest -> Some fb, rest
-  | Some (_, _), _ -> None, None
-  | None, _ -> None, None
+    ) env (opcode, meta.r) e |> makeFinishedBlock *)
+  | Some (ParsedAsm (FinishedBlock fb), _) -> Some fb, e'
+  | Some (_, _) -> None, None
+  | None -> None, None
 let rec parse env e = parseRec env (Some e) []
   |> List.rev
   |> fun it -> finishedBlockOf (MetaBlock it), snd e
