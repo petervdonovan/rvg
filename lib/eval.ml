@@ -25,8 +25,7 @@ and evalExprRec env e =
   | Ast.Var _, _ ->
       raise
         (EvalFail
-           ( "A parameter is not an expression, but tried to evaluate "
-             ^ Ast.exprToString e
+           ( "A parameter is not an expression, but tried to evaluate " ^ Ast.exprToString e
            , [Ast.rangeOf e] ) )
   | Ast.ParsedAsm _, _ ->
       (e, env)
@@ -36,14 +35,11 @@ and evalExprRec env e =
       let exprs', env' = evalExprListInOrder env (List.rev tem) in
       let exprs' = mergeExprs exprs' in
       let tem =
-        ( Ast.Template
-            (exprs', if Environment.is_empty prevEnv then env else prevEnv)
-        , meta )
+        (Ast.Template (exprs', if Environment.is_empty prevEnv then env else prevEnv), meta)
       in
       (tem, env')
   | Ast.Lam {params; lbody; env= prevEnv; f}, meta ->
-      if Environment.is_empty prevEnv then
-        ((Ast.Lam {params; lbody; env; f}, meta), env)
+      if Environment.is_empty prevEnv then ((Ast.Lam {params; lbody; env; f}, meta), env)
       else (e, env)
   | Ast.LamApplication {lam; args}, meta -> (
       let args', env' = evalExprListInOrder env args in
@@ -52,10 +48,7 @@ and evalExprRec env e =
       | Lam {params; lbody; env= env''; f}, _ ->
           (f args' params lbody env'' env' (evalSequence meta.r) meta.r, env')
       | e ->
-          raise
-            (EvalFail
-               ("Expected Lam but got " ^ Ast.exprToString e, [Ast.rangeOf e])
-            ) )
+          raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e, [Ast.rangeOf e])) )
   | Ast.Def define, meta ->
       let evaluated = (evalSequence meta.r) env define.dvalue in
       (evaluated, bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
@@ -71,8 +64,7 @@ and evalExprListInOrder env exprList =
   (exprs, env)
 
 and evalSequence r env exprList =
-  if List.length exprList == 0 then
-    raise (EvalFail ("Expected sequence, but got nothing", [r]))
+  if List.length exprList == 0 then raise (EvalFail ("Expected sequence, but got nothing", [r]))
   else
     let exprs', _ = evalExprListInOrder env exprList in
     let head = List.hd exprs' in
@@ -91,8 +83,7 @@ and bindNames env params args r =
   else
     raise
       (EvalFail
-         ( "Expected " ^ string_of_int nparams
-           ^ " arguments corresponding to parameters "
+         ( "Expected " ^ string_of_int nparams ^ " arguments corresponding to parameters "
            ^ String.concat ", " (List.map (fun (v : Ast.var) -> v.name) params)
            ^ " but got " ^ string_of_int nargs ^ " arguments: "
            ^ String.concat ", " (List.map Ast.exprToString args)
@@ -100,8 +91,7 @@ and bindNames env params args r =
 
 and applyChecks env (param : Ast.var) arg =
   List.fold_left
-    (fun (arg, env') (check, meta) ->
-      evalExpr env' (LamApplication {lam= check; args= [arg]}, meta) )
+    (fun (arg, env') (check, meta) -> evalExpr env' (LamApplication {lam= check; args= [arg]}, meta))
     (arg, env) param.checks
 
 and mergeExprs es =
@@ -116,8 +106,7 @@ and mergeExprs es =
                 ( Ast.Asm (s ^ s')
                 , { attrs= Ast.Attributes.union meta.attrs meta'.attrs
                   ; r=
-                      ( { startInclusive= meta.r.startInclusive
-                        ; endExclusive= meta'.r.endExclusive }
+                      ( {startInclusive= meta.r.startInclusive; endExclusive= meta'.r.endExclusive}
                         : CharStream.range ) } )
                 :: List.tl acc
             | _ ->
@@ -136,12 +125,10 @@ let mu args params lbody closure currentEnv evalSequence r =
   let bound = bindNames currentEnv (List.map fst params) args r in
   evalSequence (Environment.union (fun _ a _ -> Some a) bound closure) lbody
 
-let testStd =
-  Environment.empty |> Environment.add "lam" lam |> Environment.add "mu" mu
+let testStd = Environment.empty |> Environment.add "lam" lam |> Environment.add "mu" mu
 
 let printReducedAst stdFun std text =
-  text |> Ast.getAst stdFun |> evalExpr std |> fst |> Ast.exprToString
-  |> print_endline
+  text |> Ast.getAst stdFun |> evalExpr std |> fst |> Ast.exprToString |> print_endline
 
 let%expect_test _ =
   printReducedAst testStd Environment.empty "[lam [] \"\" ]" ;

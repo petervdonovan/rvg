@@ -26,17 +26,14 @@ let assertNArgs pred description args r : unit =
   if pred len then
     raise
       (WrongNumberOfArgs
-         ( "Expected " ^ description ^ " arguments, but got "
-           ^ string_of_int len ^ " arguments: "
+         ( "Expected " ^ description ^ " arguments, but got " ^ string_of_int len ^ " arguments: "
            ^ (args |> List.map Ast.exprToString |> String.concat ", ")
          , r ) )
   else ()
 
-let assertExactlyNArgs n args r =
-  assertNArgs (( <> ) n) ("exactly " ^ string_of_int n) args r
+let assertExactlyNArgs n args r = assertNArgs (( <> ) n) ("exactly " ^ string_of_int n) args r
 
-let assertAtLeastNArgs n args r =
-  assertNArgs (( > ) n) ("at least " ^ string_of_int n) args r
+let assertAtLeastNArgs n args r = assertNArgs (( > ) n) ("at least " ^ string_of_int n) args r
 
 let getNumericalArg r arg =
   match arg with
@@ -45,8 +42,8 @@ let getNumericalArg r arg =
   | _ ->
       raise
         (IllegalArgument
-           ( "Expected numerical arg, but got expression \""
-             ^ Ast.exprToString arg ^ "\"of the wrong type"
+           ( "Expected numerical arg, but got expression \"" ^ Ast.exprToString arg
+             ^ "\"of the wrong type"
            , r ) )
 
 let errorReportingPrintExpr e =
@@ -58,28 +55,21 @@ let trueLambda =
     { params= []
     ; lbody= []
     ; env= E.empty
-    ; f=
-        (fun args _ _ _ _ _ r ->
-          assertExactlyNArgs 2 args r ;
-          List.hd args ) }
+    ; f= (fun args _ _ _ _ _ r -> assertExactlyNArgs 2 args r ; List.hd args) }
 
 let falseLambda =
   Ast.Lam
     { params= []
     ; lbody= []
     ; env= E.empty
-    ; f=
-        (fun args _ _ _ _ _ r ->
-          assertExactlyNArgs 2 args r ;
-          List.nth args 1 ) }
+    ; f= (fun args _ _ _ _ _ r -> assertExactlyNArgs 2 args r ; List.nth args 1) }
 
 let nargsAttr k = "nargs=" ^ string_of_int k
 
 let varargsAttr = "varargs"
 
 let hasNargsAttr k (metadata : Ast.metadata) =
-  Ast.Attributes.mem (nargsAttr k) metadata.attrs
-  || Ast.Attributes.mem varargsAttr metadata.attrs
+  Ast.Attributes.mem (nargsAttr k) metadata.attrs || Ast.Attributes.mem varargsAttr metadata.attrs
 
 let emptyLam nargs r closure f =
   ( Ast.Lam
@@ -98,14 +88,12 @@ let emptyVarargsLam r closure f =
 
 let addattrInternal attr expr =
   let content, (meta' : Ast.metadata) = expr in
-  ( content
-  , ({attrs= Ast.Attributes.add attr meta'.attrs; r= meta'.r} : Ast.metadata) )
+  (content, ({attrs= Ast.Attributes.add attr meta'.attrs; r= meta'.r} : Ast.metadata))
 
 let print args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r ;
   let arg = List.hd args in
-  addattrInternal "print"
-    (emptyLam 0 r closure (fun _ _ _ _ _ _ _ -> conditionalPrint arg))
+  addattrInternal "print" (emptyLam 0 r closure (fun _ _ _ _ _ _ _ -> conditionalPrint arg))
 
 let fail args _ _ closure _ _ r =
   assertAtLeastNArgs 1 args r ;
@@ -120,15 +108,13 @@ let acceptFragment _ args r =
 
 let addattr args _ _ closure _ _ r =
   let s, _ = acceptFragment "Attribute" args r in
-  emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
-      addattrInternal s (List.hd args) )
+  emptyLam 1 r closure (fun args _ _ _ _ _ _ -> addattrInternal s (List.hd args))
 
 let hasattr args _ _ closure _ _ r =
   let s, _ = acceptFragment "Attribute" args r in
   emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
       let _, meta' = List.hd args in
-      ( (if Ast.Attributes.mem s meta'.attrs then trueLambda else falseLambda)
-      , meta' ) )
+      ((if Ast.Attributes.mem s meta'.attrs then trueLambda else falseLambda), meta') )
 
 let isLam args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r ;
@@ -154,9 +140,7 @@ let lamOf paramChecks _ _ closure _ _ r =
       | Ast.Lam _, _ ->
           ()
       | _ ->
-          raise
-            (Eval.AssertionFail ("Expected lam but got " ^ Ast.exprToString e, r)
-            ) )
+          raise (Eval.AssertionFail ("Expected lam but got " ^ Ast.exprToString e, r)) )
     paramChecks ;
   emptyLam 1 r closure (fun args _ _ _ _ _ r ->
       let checkee = List.hd args in
@@ -164,15 +148,11 @@ let lamOf paramChecks _ _ closure _ _ r =
       | Lam (l : Ast.lam), meta ->
           let nParams = List.length paramChecks in
           (let actualNParams = List.length l.params in
-           if
-             actualNParams <> nParams
-             && not (hasNargsAttr nParams (snd checkee))
-           then
+           if actualNParams <> nParams && not (hasNargsAttr nParams (snd checkee)) then
              raise
                (Eval.AssertionFail
                   ( "Expected " ^ string_of_int nParams ^ " params, not "
-                    ^ string_of_int actualNParams
-                    ^ " "
+                    ^ string_of_int actualNParams ^ " "
                   , (snd checkee).r ) ) ) ;
           let ({params; lbody; env; f} : Ast.lam) = l in
           let instrumented =
@@ -188,21 +168,17 @@ let lamOf paramChecks _ _ closure _ _ r =
                       List.map2
                         (fun paramCheck arg ->
                           Eval.evalExpr closure
-                            ( Ast.LamApplication {lam= paramCheck; args= [arg]}
-                            , snd arg ) )
+                            (Ast.LamApplication {lam= paramCheck; args= [arg]}, snd arg) )
                         paramChecks args
                       |> List.map fst
                     in
                     f args' params lbody closure' currentEnv evalSequence r ) }
           in
           ( instrumented
-          , ( { attrs= Ast.Attributes.add (nargsAttr nParams) meta.attrs
-              ; r= meta.r }
-              : Ast.metadata ) )
+          , ({attrs= Ast.Attributes.add (nargsAttr nParams) meta.attrs; r= meta.r} : Ast.metadata)
+          )
       | _ ->
-          raise
-            (Eval.AssertionFail
-               ("Expected lam but got " ^ Ast.exprToString checkee, r) ) )
+          raise (Eval.AssertionFail ("Expected lam but got " ^ Ast.exprToString checkee, r)) )
 
 let isX predicate args _ _ _ _ _ r =
   assertExactlyNArgs 1 args r ;
@@ -245,17 +221,11 @@ let isReg args _ _ _ currentEnv _ r =
   | _ ->
       (falseLambda, meta')
 
-let unsafeAssertKCyclesFb k (f : Assembly.finished_block) :
-    Assembly.finished_block =
-  { content= f.content
-  ; provides= f.provides
-  ; totalCycles= Some k
-  ; cyclesMod= f.cyclesMod }
+let unsafeAssertKCyclesFb k (f : Assembly.finished_block) : Assembly.finished_block =
+  {content= f.content; provides= f.provides; totalCycles= Some k; cyclesMod= f.cyclesMod}
 
 let rec getCycles r (f : Assembly.finished_block) =
-  let ({content; provides; totalCycles; cyclesMod} : Assembly.finished_block) =
-    f
-  in
+  let ({content; provides; totalCycles; cyclesMod} : Assembly.finished_block) = f in
   let totalCycles' =
     match totalCycles with
     | Some k ->
@@ -267,14 +237,11 @@ let rec getCycles r (f : Assembly.finished_block) =
         | Some k ->
             k
         | None ->
-            raise
-              (Eval.AssertionFail
-                 ("Failed to determine exact number of cycles", r) ) )
+            raise (Eval.AssertionFail ("Failed to determine exact number of cycles", r)) )
       | Assembly.MetaBlock mb ->
           List.fold_left ( + ) 0 (List.map (getCycles r) mb |> List.map snd) )
   in
-  ( ( {content; provides; totalCycles= Some totalCycles'; cyclesMod}
-      : Assembly.finished_block )
+  ( ({content; provides; totalCycles= Some totalCycles'; cyclesMod} : Assembly.finished_block)
   , totalCycles' )
 
 let getFinishedBlock arg currentEnv = AssemblyParse.parse currentEnv arg
@@ -302,16 +269,13 @@ let safeAssertKCycles args _ _ closure currentEnv _ r =
   emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
       args' |> List.hd
       |> fun x ->
-      ( ( getFinishedBlock x currentEnv
-        |> fst |> getCycles r
+      ( ( getFinishedBlock x currentEnv |> fst |> getCycles r
         |> fun (x, k') ->
         if k = k' then Ast.ParsedAsm (Assembly.FinishedBlock x)
         else
           raise
             (Eval.AssertionFail
-               ( "Expected " ^ string_of_int k ^ " cycles but got "
-                 ^ string_of_int k'
-               , r ) ) )
+               ("Expected " ^ string_of_int k ^ " cycles but got " ^ string_of_int k', r) ) )
       , args |> List.hd |> snd ) )
 
 let unsafeAssertKCycles args _ _ closure currentEnv _ r =
@@ -320,8 +284,7 @@ let unsafeAssertKCycles args _ _ closure currentEnv _ r =
       let k, _ = args |> List.hd |> getNumericalArg r in
       let asmexpr = args' |> List.hd in
       let asmtem', metadata = getFinishedBlock asmexpr currentEnv in
-      ( Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem'))
-      , metadata ) )
+      (Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')), metadata) )
 
 let binaryMathOp op args _ _ _ _ _ r =
   assertExactlyNArgs 2 args r ;
@@ -337,8 +300,7 @@ let binaryMathOpMod op args _ _ closure _ _ r =
          let op'ed = op a b mod m in
          if op'ed >= 0 then op'ed else op'ed + m ) )
 
-let assertNumericalComparisonResult comparator description args _ _ closure _ _
-    r =
+let assertNumericalComparisonResult comparator description args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r ;
   let arg0, _ = args |> List.hd |> getNumericalArg r in
   emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
@@ -348,8 +310,8 @@ let assertNumericalComparisonResult comparator description args _ _ closure _ _
       else
         raise
           (Eval.AssertionFail
-             ( "Expected " ^ description ^ " " ^ string_of_int arg0
-               ^ " but got " ^ string_of_int arg1
+             ( "Expected " ^ description ^ " " ^ string_of_int arg0 ^ " but got "
+               ^ string_of_int arg1
              , r1.r ) ) )
 
 let foldRange args _ _ closure _ _ r =
@@ -366,13 +328,12 @@ let foldRange args _ _ closure _ _ r =
                (fun acc next ->
                  fst
                    (Eval.evalExpr currentEnv
-                      ( Ast.LamApplication {lam= List.hd args; args= [acc; next]}
-                      , Ast.metaInitial r ) ) )
+                      (Ast.LamApplication {lam= List.hd args; args= [acc; next]}, Ast.metaInitial r) )
+                 )
                initial
                ( Seq.unfold
                    (fun (current, n) ->
-                     if n = count then None
-                     else Some (current, (current + step, n + 1)) )
+                     if n = count then None else Some (current, (current + step, n + 1)) )
                    (start, 0)
                |> Seq.map (fun x -> (Ast.Integer x, Ast.metaInitial r)) ) ) ) )
 
@@ -387,23 +348,18 @@ let applierifyVarargs args _ _ closure _ _ r =
                 [ emptyLam 1 r' closure' (fun args _ _ _ _ _ r'' ->
                       let nestedApplyee = List.hd args in
                       Eval.evalExpr currentEnv
-                        ( Ast.LamApplication {lam= nestedApplyee; args= varargs}
-                        , Ast.metaInitial r'' )
+                        (Ast.LamApplication {lam= nestedApplyee; args= varargs}, Ast.metaInitial r'')
                       |> fst ) ] }
         , Ast.metaInitial r' )
       |> fst )
 
 let stdFun : Ast.lam_function E.t =
-  E.empty |> E.add "lam" Eval.lam |> E.add "mu" Eval.mu |> E.add "print" print
-  |> E.add "fail" fail
-  |> E.add "cycles?" exactCycles
-  |> E.add "cycles!" safeAssertKCycles
+  E.empty |> E.add "lam" Eval.lam |> E.add "mu" Eval.mu |> E.add "print" print |> E.add "fail" fail
+  |> E.add "cycles?" exactCycles |> E.add "cycles!" safeAssertKCycles
   |> E.add "unsafe-assert-exact-cycles" unsafeAssertKCycles
-  |> E.add "block!" assertBlock |> E.add "addattr" addattr
-  |> E.add "hasattr" hasattr |> E.add "lam?" isLam |> E.add "lamof" lamOf
-  |> E.add "num?" isNum |> E.add "frag?" isFragment
-  |> E.add "block?" isFinishedBlock
-  |> E.add "reg?" isReg
+  |> E.add "block!" assertBlock |> E.add "addattr" addattr |> E.add "hasattr" hasattr
+  |> E.add "lam?" isLam |> E.add "lamof" lamOf |> E.add "num?" isNum |> E.add "frag?" isFragment
+  |> E.add "block?" isFinishedBlock |> E.add "reg?" isReg
   |> E.add "+" (binaryMathOp ( + ))
   |> E.add "*" (binaryMathOp ( * ))
   |> E.add "-" (binaryMathOp ( - ))
@@ -415,19 +371,16 @@ let stdFun : Ast.lam_function E.t =
   |> E.add "mod/" (binaryMathOpMod ( / ))
   |> E.add "=!" (assertNumericalComparisonResult ( = ) "exactly")
   |> E.add "<!" (assertNumericalComparisonResult ( < ) "less than")
-  |> E.add "<=!"
-       (assertNumericalComparisonResult ( <= ) "less than or equal to")
+  |> E.add "<=!" (assertNumericalComparisonResult ( <= ) "less than or equal to")
   |> E.add ">!" (assertNumericalComparisonResult ( > ) "greater than")
-  |> E.add ">=!"
-       (assertNumericalComparisonResult ( >= ) "greater than or equal to")
+  |> E.add ">=!" (assertNumericalComparisonResult ( >= ) "greater than or equal to")
   |> E.add "fold-range" foldRange
   |> E.add "applierify-varargs" applierifyVarargs
 
 let std =
   E.map
     (fun f ->
-      addattrInternal "std"
-        (Ast.Lam {params= []; lbody= []; env= E.empty; f}, Ast.metaEmpty) )
+      addattrInternal "std" (Ast.Lam {params= []; lbody= []; env= E.empty; f}, Ast.metaEmpty) )
     stdFun
 
 let%expect_test _ =
@@ -462,8 +415,7 @@ let%expect_test _ =
       print_endline (CharStream.rangeToString r)
   | Eval.EvalFail (s, _) ->
       print_endline s ) ;
-  [%expect
-    {|
+  [%expect {|
     help: [] line 5, col 19 to line 5, col 25
     Assertion failed |}]
 

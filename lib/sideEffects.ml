@@ -1,8 +1,4 @@
-type mode =
-  | Tokens
-  | Definition of CharStream.position
-  | Hover of CharStream.position
-  | Execution
+type mode = Tokens | Definition of CharStream.position | Hover of CharStream.position | Execution
 
 let getPosition argvStart =
   let zeroBasedLine = int_of_string (Array.get Sys.argv (argvStart + 0)) in
@@ -21,53 +17,31 @@ let currentMode =
   | _ ->
       Execution
 
-let nargs =
-  match currentMode with
-  | Tokens ->
-      1
-  | Definition _ ->
-      4
-  | Hover _ ->
-      4
-  | Execution ->
-      0
+let nargs = match currentMode with Tokens -> 1 | Definition _ -> 4 | Hover _ -> 4 | Execution -> 0
 
 let sideEffectsAllowed = currentMode = Execution
 
 let posToList (p : CharStream.position) =
-  "["
-  ^ string_of_int p.zeroBasedLine
-  ^ ", "
-  ^ string_of_int p.zeroBasedCol
-  ^ "]"
+  "[" ^ string_of_int p.zeroBasedLine ^ ", " ^ string_of_int p.zeroBasedCol ^ "]"
 
 let rangeToList (r : CharStream.range) =
   "[" ^ posToList r.startInclusive ^ ", " ^ posToList r.endExclusive ^ "]"
 
 let rangeToJson (r : CharStream.range) =
-  "{ \"file\": \"" ^ r.startInclusive.file ^ "\", \"range\": " ^ rangeToList r
-  ^ " }"
+  "{ \"file\": \"" ^ r.startInclusive.file ^ "\", \"range\": " ^ rangeToList r ^ " }"
 
 let announceToken expr (r : CharStream.range) =
   let content, ({attrs; _} : Ast.metadata) = expr in
   let kind =
-    match content with
-    | Ast.Lam _ ->
-        Some "function"
-    | Ast.ParsedAsm _ ->
-        Some "string"
-    | _ ->
-        None
+    match content with Ast.Lam _ -> Some "function" | Ast.ParsedAsm _ -> Some "string" | _ -> None
   in
-  let modifier =
-    if Ast.Attributes.mem "std" attrs then "defaultLibrary" else ""
-  in
+  let modifier = if Ast.Attributes.mem "std" attrs then "defaultLibrary" else "" in
   match kind with
   | Some kind ->
       if Array.get Sys.argv 1 = "tokens" then
         print_endline
-          ( "{\"kind\": \"" ^ kind ^ "\", \"modifier\": \"" ^ modifier
-          ^ "\", \"range\": " ^ rangeToJson r ^ " }" )
+          ( "{\"kind\": \"" ^ kind ^ "\", \"modifier\": \"" ^ modifier ^ "\", \"range\": "
+          ^ rangeToJson r ^ " }" )
   | None ->
       ()
 
@@ -115,19 +89,15 @@ let reportResolvedName range expr =
         ^ {|"], "cycles": |}
         ^ ( match content with
           | Ast.ParsedAsm
-              (Assembly.FinishedBlock
-                ({totalCycles= Some k; _} : Assembly.finished_block) ) ->
+              (Assembly.FinishedBlock ({totalCycles= Some k; _} : Assembly.finished_block)) ->
               string_of_int k
           | _ ->
               "null" )
         ^ {|, "cyclesMod": [|}
         ^ ( match content with
-          | Ast.ParsedAsm
-              (Assembly.FinishedBlock ({cyclesMod; _} : Assembly.finished_block))
-            ->
+          | Ast.ParsedAsm (Assembly.FinishedBlock ({cyclesMod; _} : Assembly.finished_block)) ->
               Assembly.CyclesModMap.bindings cyclesMod
-              |> List.map (fun (m, x) ->
-                     string_of_int x ^ " mod " ^ string_of_int m )
+              |> List.map (fun (m, x) -> string_of_int x ^ " mod " ^ string_of_int m)
               |> String.concat ", "
           | _ ->
               "" )

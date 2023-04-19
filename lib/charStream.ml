@@ -7,25 +7,18 @@ type position = {zeroBasedLine: int; zeroBasedCol: int; file: string}
 type range = {startInclusive: position; endExclusive: position}
 
 let posToString p =
-  "line "
-  ^ string_of_int (p.zeroBasedLine + 1)
-  ^ ", col "
-  ^ string_of_int (p.zeroBasedCol + 1)
+  "line " ^ string_of_int (p.zeroBasedLine + 1) ^ ", col " ^ string_of_int (p.zeroBasedCol + 1)
 
 let rangeToString r =
-  "[" ^ r.startInclusive.file ^ "] "
-  ^ posToString r.startInclusive
-  ^ " to " ^ posToString r.endExclusive
+  "[" ^ r.startInclusive.file ^ "] " ^ posToString r.startInclusive ^ " to "
+  ^ posToString r.endExclusive
 
 let origin file = {zeroBasedLine= 0; zeroBasedCol= 0; file}
 
 let incrementedCol p =
-  { zeroBasedLine= p.zeroBasedLine
-  ; zeroBasedCol= p.zeroBasedCol + 1
-  ; file= p.file }
+  {zeroBasedLine= p.zeroBasedLine; zeroBasedCol= p.zeroBasedCol + 1; file= p.file}
 
-let incrementedLine p =
-  {zeroBasedLine= p.zeroBasedLine + 1; zeroBasedCol= 0; file= p.file}
+let incrementedLine p = {zeroBasedLine= p.zeroBasedLine + 1; zeroBasedCol= 0; file= p.file}
 
 let singleCharRange p = {startInclusive= p; endExclusive= incrementedCol p}
 
@@ -33,11 +26,9 @@ let lessThan p' p =
   p.zeroBasedLine < p'.zeroBasedLine
   || (p.zeroBasedLine = p'.zeroBasedLine && p.zeroBasedCol < p'.zeroBasedCol)
 
-let contains p r =
-  lessThan (incrementedCol p) r.startInclusive && lessThan r.endExclusive p
+let contains p r = lessThan (incrementedCol p) r.startInclusive && lessThan r.endExclusive p
 
-type t =
-  {s: char Seq.t; current: position; previous: position Option.t; file: string}
+type t = {s: char Seq.t; current: position; previous: position Option.t; file: string}
 
 let unconsp spp =
   let {s; current; file; _} = spp in
@@ -47,10 +38,7 @@ let unconsp spp =
         ( c
         , { s= s'
           ; current=
-              ( if c = '\n' then
-                  { zeroBasedLine= current.zeroBasedLine + 1
-                  ; zeroBasedCol= 0
-                  ; file }
+              ( if c = '\n' then {zeroBasedLine= current.zeroBasedLine + 1; zeroBasedCol= 0; file}
                 else
                   { zeroBasedLine= current.zeroBasedLine
                   ; zeroBasedCol= current.zeroBasedCol + 1
@@ -61,8 +49,7 @@ let unconsp spp =
   | None ->
       None
 
-let uncons spp =
-  match unconsp spp with Some (c, spp', _) -> Some (c, spp') | None -> None
+let uncons spp = match unconsp spp with Some (c, spp', _) -> Some (c, spp') | None -> None
 
 let cons c (sp : t) =
   let {s; current= _; previous; file} = sp in
@@ -77,25 +64,20 @@ let iter f spp =
   let {s; _} = spp in
   Seq.iter f s
 
-let peek s =
-  match uncons s with Some (c, s') -> (Some c, cons c s') | None -> (None, s)
+let peek s = match uncons s with Some (c, s') -> (Some c, cons c s') | None -> (None, s)
 
 let rec takeWhileRec pred acc r s =
   match unconsp s with
   | Some (c, s', p) ->
       if pred c then (
         Buffer.add_char acc c ;
-        takeWhileRec pred acc
-          {startInclusive= r.startInclusive; endExclusive= s'.current}
-          s' )
+        takeWhileRec pred acc {startInclusive= r.startInclusive; endExclusive= s'.current} s' )
       else (acc, {startInclusive= p; endExclusive= p}, cons c s')
   | None ->
       (acc, r, s)
 
 let takeWhile pred s =
-  let buf, r, s =
-    takeWhileRec pred (Buffer.create 16) (singleCharRange s.current) s
-  in
+  let buf, r, s = takeWhileRec pred (Buffer.create 16) (singleCharRange s.current) s in
   (Buffer.contents buf, r, s)
 
 let rec consumeWhitespace (stream : t) =
@@ -106,19 +88,14 @@ let rec consumeWhitespace (stream : t) =
   | None ->
       None
 
-let rec parseTokenRec stream startInclusive current :
-    (string * t * range) option =
+let rec parseTokenRec stream startInclusive current : (string * t * range) option =
   let csp = unconsp stream in
   match csp with
   | Some (c, s, p) ->
-      if isWhitespace c then
-        Some (current, cons c s, {startInclusive; endExclusive= p})
+      if isWhitespace c then Some (current, cons c s, {startInclusive; endExclusive= p})
       else if isSymbol c then
-        if current = "" then
-          Some (String.make 1 c, s, {startInclusive; endExclusive= p})
-        else
-          Some
-            (current, cons c s, {startInclusive; endExclusive= incrementedCol p})
+        if current = "" then Some (String.make 1 c, s, {startInclusive; endExclusive= p})
+        else Some (current, cons c s, {startInclusive; endExclusive= incrementedCol p})
       else parseTokenRec s startInclusive (current ^ String.make 1 c)
   | None -> (
       if current = "" then None
@@ -140,16 +117,13 @@ let parseToken stream =
 
 let fromFile f =
   let ic = open_in f in
-  ( { s=
-        Seq.of_dispenser (fun () ->
-            try Some (input_char ic) with End_of_file -> None )
+  ( { s= Seq.of_dispenser (fun () -> try Some (input_char ic) with End_of_file -> None)
     ; current= origin f
     ; previous= None
     ; file= f }
   , ic )
 
-let fromString f s =
-  {s= String.to_seq s; current= origin f; previous= None; file= f}
+let fromString f s = {s= String.to_seq s; current= origin f; previous= None; file= f}
 
 let charSeqToString s =
   let b = Buffer.create 16 in
@@ -159,22 +133,14 @@ let charSeqToString s =
 let get2Tokens s =
   match parseToken s with
   | Some (a, s', r) -> (
-    match parseToken s' with
-    | Some (b, s'', r') ->
-        Some ((a, r), (b, r'), s'')
-    | _ ->
-        None )
+    match parseToken s' with Some (b, s'', r') -> Some ((a, r), (b, r'), s'') | _ -> None )
   | _ ->
       None
 
 let get3Tokens s =
   match get2Tokens s with
   | Some (ar, br, s') -> (
-    match parseToken s' with
-    | Some (c, s'', r) ->
-        Some (ar, br, (c, r), s'')
-    | _ ->
-        None )
+    match parseToken s' with Some (c, s'', r) -> Some (ar, br, (c, r), s'') | _ -> None )
   | _ ->
       None
 

@@ -38,9 +38,7 @@ type nonce = string
 module Noncification = Map.Make (String)
 module CyclesModMap = Map.Make (Int)
 
-type finished_block_content =
-  | MetaBlock of finished_block list
-  | Instruction of instruction
+type finished_block_content = MetaBlock of finished_block list | Instruction of instruction
 
 and finished_block =
   { content: finished_block_content
@@ -50,10 +48,7 @@ and finished_block =
 
 type block = {top: fragment; middle: finished_block list; bottom: fragment}
 
-type t =
-  | Fragment of fragment
-  | Block of block
-  | FinishedBlock of finished_block
+type t = Fragment of fragment | Block of block | FinishedBlock of finished_block
 
 let regToString reg =
   match reg with
@@ -75,36 +70,27 @@ let regToString reg =
 let instrToString instr =
   match instr with
   | RType {opc: opcode; rd: register; rs1: register; rs2: register} ->
-      ParseUtil.funNotation "RType"
-        ([fst opc] @ List.map regToString [rd; rs1; rs2])
+      ParseUtil.funNotation "RType" ([fst opc] @ List.map regToString [rd; rs1; rs2])
   | IArith {opc: opcode; rd: register; rs1: register; imm: immediate} ->
-      ParseUtil.funNotation "IArith"
-        ([fst opc] @ List.map regToString [rd; rs1] @ [fst imm])
+      ParseUtil.funNotation "IArith" ([fst opc] @ List.map regToString [rd; rs1] @ [fst imm])
   | Csr {opc: opcode; rd: register; rs1: register; imm: immediate} ->
-      ParseUtil.funNotation "Csr"
-        ([fst opc] @ List.map regToString [rd; rs1] @ [fst imm])
+      ParseUtil.funNotation "Csr" ([fst opc] @ List.map regToString [rd; rs1] @ [fst imm])
   | Load {opc: opcode; rd: register; rs1: register; imm: immediate} ->
-      ParseUtil.funNotation "Load"
-        ([fst opc] @ List.map regToString [rd; rs1] @ [fst imm])
+      ParseUtil.funNotation "Load" ([fst opc] @ List.map regToString [rd; rs1] @ [fst imm])
   | Store {opc: opcode; rs1: register; rs2: register; imm: immediate} ->
-      ParseUtil.funNotation "Store"
-        ([fst opc] @ List.map regToString [rs1; rs2] @ [fst imm])
+      ParseUtil.funNotation "Store" ([fst opc] @ List.map regToString [rs1; rs2] @ [fst imm])
   | Branch {opc: opcode; rs1: register; rs2: register; imm: immediate} ->
-      ParseUtil.funNotation "Branch"
-        ([fst opc] @ List.map regToString [rs1; rs2] @ [fst imm])
+      ParseUtil.funNotation "Branch" ([fst opc] @ List.map regToString [rs1; rs2] @ [fst imm])
   | Jal {opc: opcode; rd: register; imm: immediate} ->
-      ParseUtil.funNotation "Jal"
-        ([fst opc] @ List.map regToString [rd] @ [fst imm])
+      ParseUtil.funNotation "Jal" ([fst opc] @ List.map regToString [rd] @ [fst imm])
   | Jalr {opc: opcode; rd: register; rs1: register; imm: immediate} ->
-      ParseUtil.funNotation "Jalr"
-        ([fst opc] @ List.map regToString [rd; rs1] @ [fst imm])
+      ParseUtil.funNotation "Jalr" ([fst opc] @ List.map regToString [rd; rs1] @ [fst imm])
   | UType {opc: opcode; rd: register; imm: immediate} ->
       ParseUtil.funNotation "UType" ([fst opc] @ [regToString rd] @ [fst imm])
   | Label (s, noncify) ->
       "Label(" ^ s ^ " " ^ string_of_bool noncify ^ ")"
 
-let rec finishedBlockToStringInternal fb =
-  finishedBlockContentToStringInternal fb.content
+let rec finishedBlockToStringInternal fb = finishedBlockContentToStringInternal fb.content
 
 and finishedBlockContentToStringInternal content =
   match content with

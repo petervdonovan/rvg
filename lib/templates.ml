@@ -12,8 +12,7 @@ let asm2CharStream asm =
   | _ ->
       raise
         (ParseFail
-           ( "Expected assembly but got " ^ (asm |> exprContentToString)
-           , meta.r.startInclusive ) )
+           ("Expected assembly but got " ^ (asm |> exprContentToString), meta.r.startInclusive) )
 
 let charStream2asm (s : CharStream.t) attrs =
   let asm, r, _ = CharStream.takeWhile (fun _ -> true) s in
@@ -26,8 +25,7 @@ let rec startsWithWord e =
       if List.length exprs = 0 then true else startsWithWord (List.hd exprs)
   | Asm s ->
       if s = "" then false
-      else if ParseUtil.isWhitespace s.[0] || ParseUtil.isSymbol s.[0] then
-        false
+      else if ParseUtil.isWhitespace s.[0] || ParseUtil.isSymbol s.[0] then false
       else true
   | _ ->
       false
@@ -45,12 +43,9 @@ let rec parseToken e =
         | Some (Asm token, meta') -> (
           match remainder with
           | Some remainder ->
-              ( Some (Asm token, meta')
-              , chosenEnv
-              , Some (Template (remainder :: tail, env), meta) )
+              (Some (Asm token, meta'), chosenEnv, Some (Template (remainder :: tail, env), meta))
           | None -> (
-              if List.length tail = 0 then
-                (Some (Asm token, meta'), chosenEnv, None)
+              if List.length tail = 0 then (Some (Asm token, meta'), chosenEnv, None)
               else
                 let remainder = (Template (tail, env), meta) in
                 if not (startsWithWord remainder) then
@@ -61,8 +56,7 @@ let rec parseToken e =
                   | Some (Asm rest, meta'') ->
                       ( Some
                           ( Asm (token ^ rest)
-                          , { attrs= Attributes.union meta''.attrs meta'.attrs
-                            ; r= meta'.r } )
+                          , {attrs= Attributes.union meta''.attrs meta'.attrs; r= meta'.r} )
                       , chosenEnv
                       , remainder' )
                   | _ ->
@@ -132,8 +126,7 @@ let get3TokensWithThirdTokenInParens env e =
       else
         match get2Tokens env e' with
         | Some (rs2, ((closeParen, _), _)), e'' ->
-            if closeParen <> ")" then (None, Some e)
-            else (Some (regR, immR, rs2), e'')
+            if closeParen <> ")" then (None, Some e) else (Some (regR, immR, rs2), e'')
         | _ ->
             (None, Some e) )
   | _ ->

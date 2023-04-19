@@ -7,7 +7,7 @@ open Assembly
 let isEmpty fragment = fragment = ""
 
 let providedLabelsOf fbl =
-  let pickFirstIfBoth _ a _ = debug_print "choosing " a ; Some a in
+  let pickFirstIfBoth _ a _ = Some a in
   let unfiltered fbl' =
     List.fold_left
       (Noncification.union pickFirstIfBoth)
@@ -39,15 +39,12 @@ module NameSet = Set.Make (String)
 let strsToNameset strs = List.fold_right NameSet.add strs NameSet.empty
 
 let rTypeInstrs : NameSet.t =
-  strsToNameset
-    ["add"; "sub"; "and"; "or"; "xor"; "sll"; "srl"; "sra"; "slt"; "sltu"]
+  strsToNameset ["add"; "sub"; "and"; "or"; "xor"; "sll"; "srl"; "sra"; "slt"; "sltu"]
 
 let iTypeInstrs =
-  strsToNameset
-    ["addi"; "andi"; "ori"; "xori"; "slli"; "srli"; "srai"; "slti"; "sltiu"]
+  strsToNameset ["addi"; "andi"; "ori"; "xori"; "slli"; "srli"; "srai"; "slti"; "sltiu"]
 
-let csrInstrs =
-  strsToNameset ["csrrw"; "csrrs"; "csrrc"; "csrrwi"; "csrrsi"; "csrrci"]
+let csrInstrs = strsToNameset ["csrrw"; "csrrs"; "csrrc"; "csrrwi"; "csrrsi"; "csrrci"]
 
 let loadInstrs = strsToNameset ["lb"; "lbu"; "lh"; "lhu"; "lw"]
 
@@ -61,25 +58,9 @@ let jalrInstrs = strsToNameset ["jalr"]
 
 let temporaries =
   strsToNameset
-    [ "t0"
-    ; "t1"
-    ; "t2"
-    ; "t3"
-    ; "t4"
-    ; "t5"
-    ; "t6"
-    ; "a0"
-    ; "a1"
-    ; "a2"
-    ; "a3"
-    ; "a4"
-    ; "a5"
-    ; "a6"
-    ; "a7" ]
+    ["t0"; "t1"; "t2"; "t3"; "t4"; "t5"; "t6"; "a0"; "a1"; "a2"; "a3"; "a4"; "a5"; "a6"; "a7"]
 
-let saved =
-  strsToNameset
-    ["s0"; "s1"; "s2"; "s3"; "s4"; "s5"; "s6"; "s7"; "s8"; "s9"; "s10"; "s11"]
+let saved = strsToNameset ["s0"; "s1"; "s2"; "s3"; "s4"; "s5"; "s6"; "s7"; "s8"; "s9"; "s10"; "s11"]
 
 let failWithNoBinding name r =
   raise (AsmParseFail ("Could not find binding for name \"" ^ name ^ "\"", r))
@@ -87,8 +68,7 @@ let failWithNoBinding name r =
 let expectAsm r env name description =
   let badExprType bad =
     AsmParseFail
-      ( description ^ " expected, but found expression " ^ Ast.exprToString bad
-      , (snd bad).r )
+      (description ^ " expected, but found expression " ^ Ast.exprToString bad, (snd bad).r)
   in
   if Eval.Environment.mem name env then
     let e, _ = Eval.evalExpr env (Eval.Environment.find name env) in
@@ -108,9 +88,7 @@ let expectAsm r env name description =
       | Fragment f ->
           (f, r)
       | _ ->
-          raise
-            (AsmParseFail
-               ("Expected assembly fragment, but got assembly block", r) ) )
+          raise (AsmParseFail ("Expected assembly fragment, but got assembly block", r)) )
     | bad ->
         raise (badExprType bad)
   else failWithNoBinding name r
@@ -120,8 +98,7 @@ let rec finishedBlockToString fb =
   | Instruction i ->
       instrToString i
   | MetaBlock mb ->
-      funNotation "MetaBlock"
-        [mb |> List.map finishedBlockToString |> String.concat "\n"]
+      funNotation "MetaBlock" [mb |> List.map finishedBlockToString |> String.concat "\n"]
 
 let rec asmToString asm =
   match asm with
@@ -129,9 +106,7 @@ let rec asmToString asm =
       funNotation "Fragment" [s]
   | Block {top; middle; bottom} ->
       funNotation "Block"
-        [ top
-        ; asmToString (FinishedBlock (finishedBlockOf (MetaBlock middle)))
-        ; bottom ]
+        [top; asmToString (FinishedBlock (finishedBlockOf (MetaBlock middle))); bottom]
   | FinishedBlock fb ->
       finishedBlockToString fb
 
@@ -166,13 +141,8 @@ let resolveNumericalImm imm =
         | (Ast.Integer i, _), _ ->
             (i |> string_of_int, r)
         | e, _ ->
-            raise
-              (AsmParseFail
-                 ("expected number, not " ^ (e |> Ast.exprToString), r) )
-      else
-        raise
-          (AsmParseFail
-             (s ^ " is not a number and is not bound in the environment", r) )
+            raise (AsmParseFail ("expected number, not " ^ (e |> Ast.exprToString), r))
+      else raise (AsmParseFail (s ^ " is not a number and is not bound in the environment", r))
 
 let resolveLabel label =
   let (l, r), env = label in
@@ -187,18 +157,14 @@ let resolveLabel label =
 let asmParseFail formatDescription e r =
   raise
     (AsmParseFail
-       ( "Instruction \"" ^ Ast.exprToString e
-         ^ "\" does not follow the instruction syntax for " ^ formatDescription
+       ( "Instruction \"" ^ Ast.exprToString e ^ "\" does not follow the instruction syntax for "
+         ^ formatDescription
        , r ) )
 
 let parseR env opc e =
   match get3Tokens env e with
   | Some (rd, rs1, rs2), e' ->
-      ( Some
-          (Instruction
-             (RType
-                {opc; rd= nameToReg rd; rs1= nameToReg rs1; rs2= nameToReg rs2}
-             ) )
+      ( Some (Instruction (RType {opc; rd= nameToReg rd; rs1= nameToReg rs1; rs2= nameToReg rs2}))
       , e' )
   | None, _ ->
       (None, Some e)
@@ -208,11 +174,7 @@ let parseI env opc e =
   | Some (rd, rs1, imm), e' ->
       ( Some
           (Instruction
-             (IArith
-                { opc
-                ; rd= nameToReg rd
-                ; rs1= nameToReg rs1
-                ; imm= resolveNumericalImm imm } ) )
+             (IArith {opc; rd= nameToReg rd; rs1= nameToReg rs1; imm= resolveNumericalImm imm}) )
       , e' )
   | None, _ ->
       (None, Some e)
@@ -222,11 +184,7 @@ let parseLoad env opc e =
   | Some (rd, imm, rs1), e' ->
       ( Some
           (Instruction
-             (Load
-                { opc
-                ; rd= nameToReg rd
-                ; rs1= nameToReg rs1
-                ; imm= resolveNumericalImm imm } ) )
+             (Load {opc; rd= nameToReg rd; rs1= nameToReg rs1; imm= resolveNumericalImm imm}) )
       , e' )
   | None, _ ->
       (None, Some e)
@@ -236,11 +194,7 @@ let parseStore env opc e =
   | Some (rs2, imm, rs1), e' ->
       ( Some
           (Instruction
-             (Store
-                { opc
-                ; rs2= nameToReg rs2
-                ; rs1= nameToReg rs1
-                ; imm= resolveNumericalImm imm } ) )
+             (Store {opc; rs2= nameToReg rs2; rs1= nameToReg rs1; imm= resolveNumericalImm imm}) )
       , e' )
   | None, _ ->
       (None, Some e)
@@ -250,11 +204,7 @@ let parseBranch env opc e =
   | Some (rs1, rs2, label), e' ->
       ( Some
           (Instruction
-             (Branch
-                { opc
-                ; rs1= nameToReg rs1
-                ; rs2= nameToReg rs2
-                ; imm= resolveLabel label } ) )
+             (Branch {opc; rs1= nameToReg rs1; rs2= nameToReg rs2; imm= resolveLabel label}) )
       , e' )
   | None, _ ->
       (None, Some e)
@@ -262,8 +212,7 @@ let parseBranch env opc e =
 let parseJal env opc e =
   match get2Tokens env e with
   | Some (rd, label), e' ->
-      ( Some (Instruction (Jal {opc; rd= nameToReg rd; imm= resolveLabel label}))
-      , e' )
+      (Some (Instruction (Jal {opc; rd= nameToReg rd; imm= resolveLabel label})), e')
   | None, _ ->
       (None, Some e)
 
@@ -272,11 +221,7 @@ let parseJalr env opc e =
   | Some (rd, rs1, imm), e' ->
       ( Some
           (Instruction
-             (Jalr
-                { opc
-                ; rd= nameToReg rd
-                ; rs1= nameToReg rs1
-                ; imm= resolveNumericalImm imm } ) )
+             (Jalr {opc; rd= nameToReg rd; rs1= nameToReg rs1; imm= resolveNumericalImm imm}) )
       , e' )
   | None, _ ->
       (None, Some e)
@@ -307,11 +252,7 @@ let parseJ env opc e =
   let _, r = opc in
   match parseTokenExpectingString env e with
   | Some (label, r'), e' ->
-      ( Some
-          (Instruction
-             (Jal {opc= ("jal", r); rd= Zero r; imm= resolveLabel (label, r')})
-          )
-      , e' )
+      (Some (Instruction (Jal {opc= ("jal", r); rd= Zero r; imm= resolveLabel (label, r')})), e')
   | None, _ ->
       (None, Some e)
 
@@ -321,17 +262,12 @@ let parseJr env opc e =
   | Some (rs1s, r'), e' ->
       ( Some
           (Instruction
-             (Jalr
-                { opc= ("jalr", r)
-                ; rd= Zero r
-                ; rs1= nameToReg (rs1s, r')
-                ; imm= ("0", r) } ) )
+             (Jalr {opc= ("jalr", r); rd= Zero r; rs1= nameToReg (rs1s, r'); imm= ("0", r)}) )
       , e' )
   | None, _ ->
       (None, Some e)
 
-let parseLa _ opc _ =
-  raise (AsmParseFail ("la is not currently supported", snd opc))
+let parseLa _ opc _ = raise (AsmParseFail ("la is not currently supported", snd opc))
 
 let parseLi env opc e =
   let _, r = opc in
@@ -349,11 +285,8 @@ let parseLi env opc e =
              ( ( if upper = 0 then []
                  else
                    [ finishedBlockOf
-                       (Instruction
-                          (UType
-                             { opc= ("lui", r)
-                             ; rd
-                             ; imm= (string_of_int upper, immr) } ) ) ] )
+                       (Instruction (UType {opc= ("lui", r); rd; imm= (string_of_int upper, immr)}))
+                   ] )
              @
              if lower = 0 && upper <> 0 then []
              else
@@ -376,11 +309,7 @@ let parseMv env opc e =
   | Some (rd, rs1), e' ->
       ( Some
           (Instruction
-             (IArith
-                { opc= ("addi", r)
-                ; rd= nameToReg rd
-                ; rs1= nameToReg rs1
-                ; imm= ("0", r) } ) )
+             (IArith {opc= ("addi", r); rd= nameToReg rd; rs1= nameToReg rs1; imm= ("0", r)}) )
       , e' )
 
 let parseNeg env opc e =
@@ -390,20 +319,12 @@ let parseNeg env opc e =
       (None, Some e)
   | Some (rd, rs1), e' ->
       ( Some
-          (Instruction
-             (RType
-                { opc= ("sub", r)
-                ; rd= nameToReg rd
-                ; rs1= nameToReg rs1
-                ; rs2= Zero r } ) )
+          (Instruction (RType {opc= ("sub", r); rd= nameToReg rd; rs1= nameToReg rs1; rs2= Zero r}))
       , e' )
 
 let parseNop _ opc e =
   let _, r = opc in
-  ( Some
-      (Instruction
-         (IArith {opc= ("addi", r); rd= Zero r; rs1= Zero r; imm= ("0", r)}) )
-  , Some e )
+  (Some (Instruction (IArith {opc= ("addi", r); rd= Zero r; rs1= Zero r; imm= ("0", r)})), Some e)
 
 let parseNot env opc s =
   let _, r = opc in
@@ -413,19 +334,12 @@ let parseNot env opc s =
   | Some (rd, rs1), e' ->
       ( Some
           (Instruction
-             (IArith
-                { opc= ("xori", r)
-                ; rd= nameToReg rd
-                ; rs1= nameToReg rs1
-                ; imm= ("-1", r) } ) )
+             (IArith {opc= ("xori", r); rd= nameToReg rd; rs1= nameToReg rs1; imm= ("-1", r)}) )
       , e' )
 
 let parseRet _ opc e =
   let _, r = opc in
-  ( Some
-      (Instruction
-         (Jalr {opc= ("jalr", r); rd= Zero r; rs1= Ra r; imm= ("0", r)}) )
-  , Some e )
+  (Some (Instruction (Jalr {opc= ("jalr", r); rd= Zero r; rs1= Ra r; imm= ("0", r)})), Some e)
 
 let parseCsrInstr env opc e =
   let opc, r = opc in
@@ -435,11 +349,8 @@ let parseCsrInstr env opc e =
   | Some (rd, csr, rs1), e' ->
       ( Some
           (Instruction
-             (Csr
-                { opc= (opc, r)
-                ; rd= nameToReg rd
-                ; rs1= nameToReg rs1
-                ; imm= resolveNumericalImm csr } ) )
+             (Csr {opc= (opc, r); rd= nameToReg rd; rs1= nameToReg rs1; imm= resolveNumericalImm csr}
+             ) )
       , e' )
 
 let parseCsrw env opc e =
@@ -451,10 +362,8 @@ let parseCsrw env opc e =
       ( Some
           (Instruction
              (Csr
-                { opc= ("csrrw", r)
-                ; rd= Zero r
-                ; rs1= nameToReg source
-                ; imm= resolveNumericalImm csr } ) )
+                {opc= ("csrrw", r); rd= Zero r; rs1= nameToReg source; imm= resolveNumericalImm csr}
+             ) )
       , e' )
 
 let parseCsrr env opc e =
@@ -465,11 +374,8 @@ let parseCsrr env opc e =
   | Some (dest, csr), e' ->
       ( Some
           (Instruction
-             (Csr
-                { opc= ("csrrs", r)
-                ; rd= nameToReg dest
-                ; rs1= Zero r
-                ; imm= resolveNumericalImm csr } ) )
+             (Csr {opc= ("csrrs", r); rd= nameToReg dest; rs1= Zero r; imm= resolveNumericalImm csr})
+          )
       , e' )
 
 let parseRdcycle env opc e =
@@ -481,18 +387,15 @@ let parseRdcycle env opc e =
       ( Some
           (Instruction
              (Csr
-                { opc= ("csrrs", r')
-                ; rd= nameToReg ((rd, r'), env')
-                ; rs1= Zero r
-                ; imm= ("0xb00", r) } ) )
+                {opc= ("csrrs", r'); rd= nameToReg ((rd, r'), env'); rs1= Zero r; imm= ("0xb00", r)}
+             ) )
       , e' )
 
 let rec renoncify fb =
   match fb.content with
   | Instruction (Label (l, noncifiable)) ->
       { content= fb.content
-      ; provides=
-          Noncification.singleton l (if noncifiable then nonce () else "")
+      ; provides= Noncification.singleton l (if noncifiable then nonce () else "")
       ; totalCycles= fb.totalCycles
       ; cyclesMod= fb.cyclesMod }
   | Instruction _ ->
@@ -538,8 +441,7 @@ let tryParse env e =
          else if opcode = "csrw" then parseCsrw
          else if opcode = "csrr" then parseCsrr
          else if opcode = "rdcycle" then parseRdcycle
-         else if String.ends_with ~suffix:":" opcode && String.length opcode > 1
-         then fun _ _ _ ->
+         else if String.ends_with ~suffix:":" opcode && String.length opcode > 1 then fun _ _ _ ->
            ( Some
                (Instruction
                   (Label
@@ -557,8 +459,7 @@ let tryParse env e =
       (None, None)
 
 let rec parse env e =
-  parseRec env (Some e) [] |> List.rev
-  |> fun it -> (finishedBlockOf (MetaBlock it), snd e)
+  parseRec env (Some e) [] |> List.rev |> fun it -> (finishedBlockOf (MetaBlock it), snd e)
 
 and parseRec env e acc =
   match e with
@@ -572,9 +473,8 @@ and parseRec env e acc =
         acc
     | None, _ ->
         raise
-          (AsmParseFail
-             ( "Expected assembly in parse but got " ^ (e |> Ast.exprToString)
-             , (snd e).r ) ) )
+          (AsmParseFail ("Expected assembly in parse but got " ^ (e |> Ast.exprToString), (snd e).r))
+    )
 
 let rec print pasm =
   match pasm with
@@ -599,16 +499,14 @@ and stringifyInstruction hierarchicalNoncifications i =
   let noncify r label =
     try
       let n =
-        Noncification.find label
-          (List.find (Noncification.mem label) hierarchicalNoncifications)
+        Noncification.find label (List.find (Noncification.mem label) hierarchicalNoncifications)
       in
       if n = "" then label else label ^ "_" ^ n
     with Not_found ->
       raise
         (AsmParseFail
            ( "Could not find label " ^ label
-             ^ " in the current context, and so could not print the label with \
-                the correct nonce"
+             ^ " in the current context, and so could not print the label with the correct nonce"
            , r ) )
   in
   let ( $ ) s reg =
@@ -656,8 +554,7 @@ and stringifyInstruction hierarchicalNoncifications i =
       opc < rd = imm
   | Label (s, _) ->
       noncify
-        ( { startInclusive= CharStream.origin "TODO"
-          ; endExclusive= CharStream.origin "TODO" }
+        ( {startInclusive= CharStream.origin "TODO"; endExclusive= CharStream.origin "TODO"}
           : CharStream.range )
         s
       ^ ":" )
