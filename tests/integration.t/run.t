@@ -74,10 +74,10 @@
       addi a0, zero, 0
       addi t0, zero, 0
       addi t1, zero, 10
-  LOOP_tJ6slU7Skn:
+  LOOP_dCcIYk9YE4:
       add a0, a0, t0
       addi t0, t0, 1
-      blt t0, t1, LOOP_tJ6slU7Skn
+      blt t0, t1, LOOP_xx2KBeM1TM
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg rvg-stdlib/ctrl.rvg 12.rvg
   3
   7

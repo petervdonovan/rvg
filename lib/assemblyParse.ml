@@ -4,11 +4,6 @@ open ParseUtil
 open Templates
 open Assembly
 
-let todo =
-  ( { startInclusive= CharStream.origin "TODO"
-    ; endExclusive= CharStream.origin "TODO" }
-    : CharStream.range )
-
 let isEmpty fragment = fragment = ""
 
 let finishedBlockOf content =
@@ -23,7 +18,7 @@ let finishedBlockOf content =
       | Instruction instr -> (
         match instr with
         | Label (s, noncify) ->
-            Noncification.singleton s (if noncify then "_" ^ nonce () else "")
+            Noncification.singleton s (if noncify then nonce () else "")
         | _ ->
             Noncification.empty ) )
   ; totalCycles= None
@@ -482,6 +477,32 @@ let parseRdcycle env opc e =
                 ; imm= ("0xb00", r) } ) )
       , e' )
 
+let rec renoncify fb =
+  match fb.content with
+  | Instruction (Label (l, noncifiable)) ->
+      { content= fb.content
+      ; provides=
+          Noncification.singleton l (if noncifiable then nonce () else "")
+      ; totalCycles= fb.totalCycles
+      ; cyclesMod= fb.cyclesMod }
+  | Instruction _ ->
+      { content= fb.content
+      ; provides= fb.provides
+      ; totalCycles= fb.totalCycles
+      ; cyclesMod= fb.cyclesMod }
+  | MetaBlock fbl ->
+      let fbl' = fbl |> List.map renoncify in
+      let provides =
+        List.fold_left
+          (Noncification.union (fun _ a _ -> Some a))
+          Noncification.empty
+          (fbl' |> List.map (fun c -> c.provides))
+      in
+      { content= MetaBlock fbl'
+      ; provides
+      ; totalCycles= fb.totalCycles
+      ; cyclesMod= fb.cyclesMod }
+
 let tryParse env e =
   let makeFinishedBlock o =
     let o, e' = o in
@@ -527,7 +548,7 @@ let tryParse env e =
          env (opcode, meta.r) e'' )
       |> makeFinishedBlock
   | Some (ParsedAsm (FinishedBlock fb), _) ->
-      (Some fb, e')
+      (Some (fb |> renoncify), e')
   | Some (_, _) ->
       (None, None)
   | None ->
@@ -575,9 +596,11 @@ and printFinishedBlock hn fb =
 and stringifyInstruction hierarchicalNoncifications i =
   let noncify r label =
     try
-      label
-      ^ Noncification.find label
+      let n =
+        Noncification.find label
           (List.find (Noncification.mem label) hierarchicalNoncifications)
+      in
+      if n = "" then label else label ^ "_" ^ n
     with Not_found ->
       raise
         (AsmParseFail

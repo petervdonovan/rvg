@@ -154,8 +154,9 @@ let lamOf paramChecks _ _ closure _ _ r =
       | Ast.Lam _, _ ->
           ()
       | _ ->
-          raise (Eval.AssertionFail ("Expected lam but got " ^ Ast.exprToString e, r))
-      )
+          raise
+            (Eval.AssertionFail ("Expected lam but got " ^ Ast.exprToString e, r)
+            ) )
     paramChecks ;
   emptyLam 1 r closure (fun args _ _ _ _ _ r ->
       let checkee = List.hd args in
@@ -267,8 +268,8 @@ let rec getCycles r (f : Assembly.finished_block) =
             k
         | None ->
             raise
-              (Eval.AssertionFail ("Failed to determine exact number of cycles", r))
-        )
+              (Eval.AssertionFail
+                 ("Failed to determine exact number of cycles", r) ) )
       | Assembly.MetaBlock mb ->
           List.fold_left ( + ) 0 (List.map (getCycles r) mb |> List.map snd) )
   in

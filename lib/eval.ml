@@ -1,12 +1,17 @@
 module Environment = Map.Make (String)
 
-exception EvalFail of string * (CharStream.range list)
+exception EvalFail of string * CharStream.range list
 
 exception AssertionFail of string * CharStream.range
 
-let rec evalExpr env e = let _, (meta: Ast.metadata) = e in try evalExprRec env e with
-  | EvalFail (s, r) -> raise (EvalFail (s, meta.r :: r))
-  | AssertionFail (s, r) -> raise (EvalFail (s, [r]))
+let rec evalExpr env e =
+  let _, (meta : Ast.metadata) = e in
+  try evalExprRec env e with
+  | EvalFail (s, r) ->
+      raise (EvalFail (s, meta.r :: r))
+  | AssertionFail (s, r) ->
+      raise (EvalFail (s, [r]))
+
 and evalExprRec env e =
   match e with
   | Ast.Name str, (meta : Ast.metadata) ->
@@ -49,7 +54,8 @@ and evalExprRec env e =
       | e ->
           raise
             (EvalFail
-               ("Expected Lam but got " ^ Ast.exprToString e, [Ast.rangeOf e]) ) )
+               ("Expected Lam but got " ^ Ast.exprToString e, [Ast.rangeOf e])
+            ) )
   | Ast.Def define, meta ->
       let evaluated = (evalSequence meta.r) env define.dvalue in
       (evaluated, bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
