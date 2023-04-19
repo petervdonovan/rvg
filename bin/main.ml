@@ -37,9 +37,7 @@ let () =
     | Rvg.Ast.ParseFail (s, (p : Rvg.CharStream.position)) ->
         printMessageRange s {startInclusive= p; endExclusive= p}
     | Rvg.Eval.EvalFail (s, r) ->
-        printMessageRange s r
-    | Rvg.Std.AssertionFail (s, r) ->
-        printMessageRange s r
+        r |> List.rev |> List.iter (printMessageRange s)
     | Rvg.Std.IllegalArgument (s, r) ->
         printMessageRange s r
     | Rvg.Std.WrongNumberOfArgs (s, r) ->

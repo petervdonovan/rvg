@@ -18,12 +18,22 @@
   E(Lam(params=[E(Var(name=b), )], lbody=E(Name(b), ); E(Template(E(Asm(this should fail), )), )), ): [3.rvg] line 7, col 19 to line 7, col 29
   Expected lam of 2 parameters: [rvg-stdlib/stdlib.rvg] line 12, col 13 to line 12, col 48
   [rvg-stdlib/stdlib.rvg] line 7, col 4 to line 7, col 13: Assertion failed
+  [rvg-stdlib/stdlib.rvg] line 10, col 4 to line 12, col 50: Assertion failed
+  [3.rvg] line 7, col 9 to line 7, col 17: Assertion failed
+  [3.rvg] line 7, col 1 to line 7, col 52: Assertion failed
+  [rvg-stdlib/stdlib.rvg] line 49, col 2 to line 49, col 10: Assertion failed
+  [3.rvg] line 1, col 2 to line 8, col 3: Assertion failed
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg 4.rvg
   testing lam!
   executing identity
   this is not a lam and should error: [4.rvg] line 8, col 6 to line 8, col 42
   Expected lam of 1 parameters: [rvg-stdlib/stdlib.rvg] line 12, col 13 to line 12, col 48
   [rvg-stdlib/stdlib.rvg] line 7, col 4 to line 7, col 13: Assertion failed
+  [rvg-stdlib/stdlib.rvg] line 10, col 4 to line 12, col 50: Assertion failed
+  [4.rvg] line 8, col 6 to line 8, col 42: Assertion failed
+  [4.rvg] line 8, col 4 to line 8, col 43: Assertion failed
+  [rvg-stdlib/stdlib.rvg] line 49, col 2 to line 49, col 10: Assertion failed
+  [4.rvg] line 1, col 2 to line 9, col 3: Assertion failed
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg 5.rvg
   curried successfully
   first thing to print
@@ -34,6 +44,11 @@
   Not a number: [6.rvg] line 7, col 4 to line 7, col 18
   Expected a number: [rvg-stdlib/stdlib.rvg] line 21, col 19 to line 21, col 46
   [rvg-stdlib/stdlib.rvg] line 7, col 4 to line 7, col 13: Assertion failed
+  [rvg-stdlib/stdlib.rvg] line 19, col 4 to line 21, col 48: Assertion failed
+  [6.rvg] line 4, col 28 to line 4, col 32: Assertion failed
+  [6.rvg] line 7, col 2 to line 7, col 19: Assertion failed
+  [rvg-stdlib/stdlib.rvg] line 49, col 2 to line 49, col 10: Assertion failed
+  [6.rvg] line 1, col 2 to line 8, col 3: Assertion failed
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg 7.rvg
   ok nop
   ok addi
@@ -47,6 +62,8 @@
       add t0, t0, t1
       addi t0, t0, 67
   [8.rvg] line 14, col 3 to line 14, col 13: Expected 3 cycles but got 4
+  [rvg-stdlib/stdlib.rvg] line 49, col 2 to line 49, col 10: Expected 3 cycles but got 4
+  [8.rvg] line 1, col 2 to line 15, col 3: Expected 3 cycles but got 4
   $ dune exec -- ../../bin/main.exe 9.rvg
   15
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg rvg-stdlib/ctrl.rvg rvg-stdlib/single-threaded.rvg 10.rvg
@@ -78,6 +95,11 @@
   y: [14.rvg] line 11, col 39 to line 11, col 42
   Expected a number: [rvg-stdlib/stdlib.rvg] line 21, col 19 to line 21, col 46
   [rvg-stdlib/stdlib.rvg] line 7, col 4 to line 7, col 13: Assertion failed
+  [rvg-stdlib/stdlib.rvg] line 19, col 4 to line 21, col 48: Assertion failed
+  [14.rvg] line 11, col 39 to line 11, col 42: Assertion failed
+  [14.rvg] line 11, col 2 to line 11, col 43: Assertion failed
+  [rvg-stdlib/stdlib.rvg] line 49, col 2 to line 49, col 10: Assertion failed
+  [14.rvg] line 1, col 2 to line 12, col 3: Assertion failed
   $ dune exec -- ../../bin/main.exe rvg-stdlib/stdlib.rvg rvg-stdlib/ctrl.rvg 15.rvg
   done computing prologue
       sw s4, 16(sp)

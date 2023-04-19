@@ -4,8 +4,6 @@ exception IllegalArgument of string * CharStream.range
 
 exception WrongNumberOfArgs of string * CharStream.range
 
-exception AssertionFail of string * CharStream.range
-
 let rec unconditionalPrint arg =
   match arg with
   | Ast.ParsedAsm pasm, _ ->
@@ -113,7 +111,7 @@ let fail args _ _ closure _ _ r =
   assertAtLeastNArgs 1 args r ;
   emptyVarargsLam r closure (fun _ _ _ _ _ _ r ->
       args |> List.iter errorReportingPrintExpr ;
-      raise (AssertionFail ("Assertion failed", r)) )
+      raise (Eval.AssertionFail ("Assertion failed", r)) )
 
 let acceptFragment _ args r =
   assertExactlyNArgs 1 args r ;
@@ -156,7 +154,7 @@ let lamOf paramChecks _ _ closure _ _ r =
       | Ast.Lam _, _ ->
           ()
       | _ ->
-          raise (AssertionFail ("Expected lam but got " ^ Ast.exprToString e, r))
+          raise (Eval.AssertionFail ("Expected lam but got " ^ Ast.exprToString e, r))
       )
     paramChecks ;
   emptyLam 1 r closure (fun args _ _ _ _ _ r ->
@@ -170,7 +168,7 @@ let lamOf paramChecks _ _ closure _ _ r =
              && not (hasNargsAttr nParams (snd checkee))
            then
              raise
-               (AssertionFail
+               (Eval.AssertionFail
                   ( "Expected " ^ string_of_int nParams ^ " params, not "
                     ^ string_of_int actualNParams
                     ^ " "
@@ -184,7 +182,7 @@ let lamOf paramChecks _ _ closure _ _ r =
               ; f=
                   (fun args params lbody closure' currentEnv evalSequence r ->
                     if List.length args <> nParams then
-                      raise (AssertionFail ("Wrong number of args: ", r)) ;
+                      raise (Eval.AssertionFail ("Wrong number of args: ", r)) ;
                     let args' =
                       List.map2
                         (fun paramCheck arg ->
@@ -202,7 +200,7 @@ let lamOf paramChecks _ _ closure _ _ r =
               : Ast.metadata ) )
       | _ ->
           raise
-            (AssertionFail
+            (Eval.AssertionFail
                ("Expected lam but got " ^ Ast.exprToString checkee, r) ) )
 
 let isX predicate args _ _ _ _ _ r =
@@ -269,7 +267,7 @@ let rec getCycles r (f : Assembly.finished_block) =
             k
         | None ->
             raise
-              (AssertionFail ("Failed to determine exact number of cycles", r))
+              (Eval.AssertionFail ("Failed to determine exact number of cycles", r))
         )
       | Assembly.MetaBlock mb ->
           List.fold_left ( + ) 0 (List.map (getCycles r) mb |> List.map snd) )
@@ -309,7 +307,7 @@ let safeAssertKCycles args _ _ closure currentEnv _ r =
         if k = k' then Ast.ParsedAsm (Assembly.FinishedBlock x)
         else
           raise
-            (AssertionFail
+            (Eval.AssertionFail
                ( "Expected " ^ string_of_int k ^ " cycles but got "
                  ^ string_of_int k'
                , r ) ) )
@@ -348,7 +346,7 @@ let assertNumericalComparisonResult comparator description args _ _ closure _ _
       if comparator arg1 arg0 then arg1expr
       else
         raise
-          (AssertionFail
+          (Eval.AssertionFail
              ( "Expected " ^ description ^ " " ^ string_of_int arg0
                ^ " but got " ^ string_of_int arg1
              , r1.r ) ) )
@@ -441,7 +439,7 @@ let%expect_test _ =
     [lam [] [fail {help}]]]]
   |}
     with
-  | AssertionFail (s, r) ->
+  | Eval.AssertionFail (s, r) ->
       print_endline s ;
       print_endline (CharStream.rangeToString r)
   | Eval.EvalFail (s, _) ->
@@ -458,7 +456,7 @@ let%expect_test _ =
     [lam [] [fail {help}]]]]
   |}
     with
-  | AssertionFail (s, r) ->
+  | Eval.AssertionFail (s, r) ->
       print_endline s ;
       print_endline (CharStream.rangeToString r)
   | Eval.EvalFail (s, _) ->
@@ -466,8 +464,7 @@ let%expect_test _ =
   [%expect
     {|
     help: [] line 5, col 19 to line 5, col 25
-    Assertion failed
-    [] line 2, col 4 to line 5, col 29 |}]
+    Assertion failed |}]
 
 let%expect_test _ =
   ( try
@@ -479,7 +476,7 @@ let%expect_test _ =
         addi t0 t0 12
       }]
   |}
-    with AssertionFail (s, r) ->
+    with Eval.AssertionFail (s, r) ->
       print_endline s ;
       print_endline (CharStream.rangeToString r) ) ;
   [%expect {| E(3, ) |}]

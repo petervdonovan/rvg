@@ -1,15 +1,20 @@
 module Environment = Map.Make (String)
 
-exception EvalFail of string * CharStream.range
+exception EvalFail of string * (CharStream.range list)
 
-let rec evalExpr env e =
+exception AssertionFail of string * CharStream.range
+
+let rec evalExpr env e = let _, (meta: Ast.metadata) = e in try evalExprRec env e with
+  | EvalFail (s, r) -> raise (EvalFail (s, meta.r :: r))
+  | AssertionFail (s, r) -> raise (EvalFail (s, [r]))
+and evalExprRec env e =
   match e with
   | Ast.Name str, (meta : Ast.metadata) ->
       if Environment.mem str env then (
         let definition : Ast.expr = Environment.find str env in
         SideEffects.reportResolvedName meta.r definition ;
         evalExpr env definition )
-      else raise (EvalFail ("Unbound name: " ^ str, Ast.rangeOf e))
+      else raise (EvalFail ("Unbound name: " ^ str, [Ast.rangeOf e]))
   | Ast.Integer _, _ ->
       (e, env)
   | Ast.Var _, _ ->
@@ -17,7 +22,7 @@ let rec evalExpr env e =
         (EvalFail
            ( "A parameter is not an expression, but tried to evaluate "
              ^ Ast.exprToString e
-           , Ast.rangeOf e ) )
+           , [Ast.rangeOf e] ) )
   | Ast.ParsedAsm _, _ ->
       (e, env)
   | Ast.Asm _, _ ->
@@ -44,7 +49,7 @@ let rec evalExpr env e =
       | e ->
           raise
             (EvalFail
-               ("Expected Lam but got " ^ Ast.exprToString e, Ast.rangeOf e) ) )
+               ("Expected Lam but got " ^ Ast.exprToString e, [Ast.rangeOf e]) ) )
   | Ast.Def define, meta ->
       let evaluated = (evalSequence meta.r) env define.dvalue in
       (evaluated, bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
@@ -61,7 +66,7 @@ and evalExprListInOrder env exprList =
 
 and evalSequence r env exprList =
   if List.length exprList == 0 then
-    raise (EvalFail ("Expected sequence, but got nothing", r))
+    raise (EvalFail ("Expected sequence, but got nothing", [r]))
   else
     let exprs', _ = evalExprListInOrder env exprList in
     let head = List.hd exprs' in
@@ -85,7 +90,7 @@ and bindNames env params args r =
            ^ String.concat ", " (List.map (fun (v : Ast.var) -> v.name) params)
            ^ " but got " ^ string_of_int nargs ^ " arguments: "
            ^ String.concat ", " (List.map Ast.exprToString args)
-         , r ) )
+         , [r] ) )
 
 and applyChecks env (param : Ast.var) arg =
   List.fold_left
