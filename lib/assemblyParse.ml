@@ -6,15 +6,25 @@ open Assembly
 
 let isEmpty fragment = fragment = ""
 
+let providedLabelsOf fbl =
+  let pickFirstIfBoth _ a _ = debug_print "choosing " a ; Some a in
+  let unfiltered fbl' =
+    List.fold_left
+      (Noncification.union pickFirstIfBoth)
+      Noncification.empty
+      (fbl' |> List.map (fun c -> c.provides))
+  in
+  let isInstr fb = match fb.content with Instruction _ -> true | _ -> false in
+  let instrsOnly = List.filter isInstr fbl in
+  let metablocks = List.filter (Fun.negate isInstr) fbl in
+  Noncification.union pickFirstIfBoth (instrsOnly |> unfiltered) (metablocks |> unfiltered)
+
 let finishedBlockOf content =
   { content
   ; provides=
       ( match content with
       | MetaBlock mb ->
-          List.fold_left
-            (Noncification.union (fun _ a _ -> Some a))
-            Noncification.empty
-            (List.map (fun c -> c.provides) mb)
+          providedLabelsOf mb
       | Instruction instr -> (
         match instr with
         | Label (s, noncify) ->
@@ -492,16 +502,8 @@ let rec renoncify fb =
       ; cyclesMod= fb.cyclesMod }
   | MetaBlock fbl ->
       let fbl' = fbl |> List.map renoncify in
-      let provides =
-        List.fold_left
-          (Noncification.union (fun _ a _ -> Some a))
-          Noncification.empty
-          (fbl' |> List.map (fun c -> c.provides))
-      in
-      { content= MetaBlock fbl'
-      ; provides
-      ; totalCycles= fb.totalCycles
-      ; cyclesMod= fb.cyclesMod }
+      let provides = providedLabelsOf fbl' in
+      {content= MetaBlock fbl'; provides; totalCycles= fb.totalCycles; cyclesMod= fb.cyclesMod}
 
 let tryParse env e =
   let makeFinishedBlock o =
