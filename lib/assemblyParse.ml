@@ -79,9 +79,10 @@ let resolveNumericalImm imm =
   let (s, r), env = imm in
   match s |> int_of_string_opt with
   | Some _ -> s, r
-  | None -> match Eval.evalExpr env (Ast.Name s, Ast.metaInitial r) with
+  | None -> if Eval.Environment.mem s env then match Eval.evalExpr env (Ast.Name s, Ast.metaInitial r) with
     | (Ast.Integer i, _), _ -> i |> string_of_int, r
     | e, _ -> raise (AsmParseFail ("expected number, not " ^ (e |> Ast.exprToString), r))
+  else raise (AsmParseFail (s ^ " is not a number and is not bound in the environment", r))
 let resolveLabel label =
   let (l, r), env = label in
   if not (Eval.Environment.mem l env) then l, r else match evalToString env l r with
