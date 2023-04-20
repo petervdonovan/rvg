@@ -9,7 +9,7 @@ let cyclesOf i =
   | Csr _ ->
       Some 1
   | Load _ ->
-      Some 2
+      Some 1 (* hardware-dependent *)
   | Store _ ->
       Some 1
   | Branch _ ->

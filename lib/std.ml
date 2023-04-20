@@ -162,8 +162,14 @@ let lamOf paramChecks _ _ closure _ _ r =
               ; env
               ; f=
                   (fun args params lbody closure' currentEnv evalSequence r ->
-                    if List.length args <> nParams then
-                      raise (Eval.AssertionFail ("Wrong number of args: ", r)) ;
+                    let nargs = List.length args in
+                    if nargs <> nParams then
+                      raise
+                        (Eval.AssertionFail
+                           ( "Wrong number of args: expected " ^ (nParams |> string_of_int)
+                             ^ " but got " ^ (nargs |> string_of_int) ^ " in "
+                             ^ (checkee |> Ast.exprToString)
+                           , r ) ) ;
                     let args' =
                       List.map2
                         (fun paramCheck arg ->
@@ -300,10 +306,21 @@ let binaryMathOpMod op args _ _ closure _ _ r =
          let op'ed = op a b mod m in
          if op'ed >= 0 then op'ed else op'ed + m ) )
 
+let rec log2 args _ _ _ _ _ r =
+  assertExactlyNArgs 1 args r ;
+  let i, _ = args |> List.hd |> getNumericalArg r in
+  (Ast.Integer (log2rec r 0 1 i), Ast.metaInitial r)
+
+and log2rec r power n i =
+  if n > i then raise (Eval.AssertionFail ((i |> string_of_int) ^ " is not divisible by 2", r))
+  else if n = i then power
+  else log2rec r (power + 1) (n * 2) i
+
 let assertNumericalComparisonResult comparator description args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r ;
   let arg0, _ = args |> List.hd |> getNumericalArg r in
   emptyLam 1 r closure (fun args _ _ _ _ _ _ ->
+      assertExactlyNArgs 1 args r ;
       let arg1expr = List.hd args in
       let arg1, r1 = arg1expr |> getNumericalArg r in
       if comparator arg1 arg0 then arg1expr
@@ -369,6 +386,7 @@ let stdFun : Ast.lam_function E.t =
   |> E.add "mod*" (binaryMathOpMod ( * ))
   |> E.add "mod-" (binaryMathOpMod ( - ))
   |> E.add "mod/" (binaryMathOpMod ( / ))
+  |> E.add "log2" log2
   |> E.add "=!" (assertNumericalComparisonResult ( = ) "exactly")
   |> E.add "<!" (assertNumericalComparisonResult ( < ) "less than")
   |> E.add "<=!" (assertNumericalComparisonResult ( <= ) "less than or equal to")
