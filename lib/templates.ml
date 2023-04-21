@@ -93,9 +93,9 @@ let parseTokenExpectingString env e =
       (None, e')
   | Some (e, meta) ->
       raise
-        (ParseFail
+        (Eval.EvalFail
            ( "expected string but got " ^ (e |> Ast.exprContentToString)
-           , (meta.r : CharStream.range).startInclusive ) )
+           , [(meta.r : CharStream.range)] ) )
 
 let get2Tokens env e =
   match parseTokenExpectingString env e with
