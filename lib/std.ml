@@ -193,6 +193,11 @@ let isX predicate args _ _ _ _ _ r =
 
 let isNum = isX (fun arg -> match arg with Ast.Integer _ -> true | _ -> false)
 
+let pred2 predicate args _ _ _ _ _ r =
+  assertExactlyNArgs 2 args r;
+  let (arg0, _), (arg1, _) = List.nth args 0, List.nth args 1 in
+  if predicate arg0 arg1 then (trueLambda, Ast.metaInitial r) else (falseLambda, Ast.metaInitial r)
+
 let isFragment =
   isX (fun arg ->
       match arg with
@@ -378,6 +383,7 @@ let stdFun : Ast.lam_function E.t =
   |> E.add "unsafe-assert-exact-cycles" unsafeAssertKCycles
   |> E.add "block!" assertBlock |> E.add "addattr" addattr |> E.add "hasattr" hasattr
   |> E.add "lam?" isLam |> E.add "lamof" lamOf |> E.add "num?" isNum |> E.add "frag?" isFragment
+  |> E.add ">?" (pred2 ( > )) |> E.add "<?" (pred2 ( < )) |> E.add "<=?" (pred2 ( <= )) |> E.add ">=?" (pred2 ( >= ))
   |> E.add "block?" isFinishedBlock |> E.add "reg?" isReg
   |> E.add "+" (binaryMathOp ( + ))
   |> E.add "*" (binaryMathOp ( * ))
