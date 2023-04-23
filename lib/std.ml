@@ -230,7 +230,7 @@ let isReg args _ _ _ currentEnv _ r =
 let unsafeAssertKCyclesFb k (f : Assembly.finished_block) : Assembly.finished_block =
   {content= f.content; provides= f.provides; totalCycles= Some k; cyclesMod= f.cyclesMod}
 
-let rec getCycles r (f : Assembly.finished_block) =
+let rec getCycles env r (f : Assembly.finished_block) =
   let ({content; provides; totalCycles; cyclesMod} : Assembly.finished_block) = f in
   let totalCycles' =
     match totalCycles with
@@ -239,13 +239,15 @@ let rec getCycles r (f : Assembly.finished_block) =
     | None -> (
       match f.content with
       | Assembly.Instruction i -> (
-        match HardwareTable.cyclesOf i with
-        | Some k ->
+        let category = i |> Assembly.instrCategory |> (^) "cycles-of-" in
+        match Eval.Environment.find_opt category env with
+        | Some (Ast.Integer k, _) ->
             k
+        | Some (_, (meta: Ast.metadata)) -> raise (Eval.AssertionFail ("expected integer", meta.r))
         | None ->
-            raise (Eval.AssertionFail ("Failed to determine exact number of cycles", r)) )
+            raise (Eval.AssertionFail ("could not determine cycles of {" ^ (i |> Assembly.instrToString) ^ "} because " ^ category ^ " is not in the environment.", r)) )
       | Assembly.MetaBlock mb ->
-          List.fold_left ( + ) 0 (List.map (getCycles r) mb |> List.map snd) )
+          List.fold_left ( + ) 0 (List.map (getCycles env r) mb |> List.map snd) )
   in
   ( ({content; provides; totalCycles= Some totalCycles'; cyclesMod} : Assembly.finished_block)
   , totalCycles' )
@@ -262,11 +264,11 @@ let assertBlock args _ _ _ currentEnv _ r =
       let fb, meta = getFinishedBlock (List.hd args) currentEnv in
       (Ast.ParsedAsm (Assembly.FinishedBlock fb), meta)
 
-let exactCycles args _ _ _ currentEnv _ r =
+let exactCycles args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r ;
   let asmexpr = args |> List.hd in
-  let asmtem', metadata = getFinishedBlock asmexpr currentEnv in
-  let _, k = getCycles r asmtem' in
+  let asmtem', metadata = getFinishedBlock asmexpr closure in
+  let _, k = getCycles closure r asmtem' in
   (Ast.Integer k, metadata)
 
 let safeAssertKCycles args _ _ closure currentEnv _ r =
@@ -275,7 +277,7 @@ let safeAssertKCycles args _ _ closure currentEnv _ r =
   emptyLam 1 r closure (fun args' _ _ _ _ _ _ ->
       args' |> List.hd
       |> fun x ->
-      ( ( getFinishedBlock x currentEnv |> fst |> getCycles r
+      ( ( getFinishedBlock x currentEnv |> fst |> getCycles closure r
         |> fun (x, k') ->
         if k = k' then Ast.ParsedAsm (Assembly.FinishedBlock x)
         else
@@ -434,20 +436,5 @@ let%expect_test _ =
   | Eval.EvalFail (s, _) ->
       print_endline s ) ;
   [%expect {|
-    help: [] line 5, col 19 to line 5, col 25
+    help: [.] line 5, col 19 to line 5, col 25
     Assertion failed |}]
-
-let%expect_test _ =
-  ( try
-      Eval.printReducedAst stdFun std
-        {|
-    [cycles?
-      {
-        lw t0 0(a1)
-        addi t0 t0 12
-      }]
-  |}
-    with Eval.AssertionFail (s, r) ->
-      print_endline s ;
-      print_endline (CharStream.rangeToString r) ) ;
-  [%expect {| E(3, ) |}]

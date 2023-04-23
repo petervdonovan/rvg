@@ -89,7 +89,28 @@ let instrToString instr =
       ParseUtil.funNotation "UType" ([fst opc] @ [regToString rd] @ [fst imm])
   | Label (s, noncify) ->
       "Label(" ^ s ^ " " ^ string_of_bool noncify ^ ")"
-
+let instrCategory instr =
+  match instr with
+  | RType _ ->
+      "rtype"
+  | IArith _ ->
+      "iarith"
+  | Csr _ ->
+      "csr"
+  | Load _ ->
+       "load"
+  | Store _ ->
+      "store"
+  | Branch _ ->
+      "control-flow"
+  | Jal _ ->
+      "control-flow"
+  | Jalr _ ->
+      "control-flow"
+  | UType _ ->
+      "utype"
+  | Label _ ->
+      "control-flow"
 let rec finishedBlockToStringInternal fb = finishedBlockContentToStringInternal fb.content
 
 and finishedBlockContentToStringInternal content =
