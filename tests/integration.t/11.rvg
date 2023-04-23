@@ -1,4 +1,4 @@
-[stdlib [mu [] [1hart [mu [] [ctrl [mu []
+[stdlib [mu [] [1hart-table [mu [] [ctrl [mu []
 [def (acc) {a0}]
 [[print [block! {
     li acc 0

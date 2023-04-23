@@ -1,6 +1,6 @@
-[stdlib [mu [] [ctrl [mu [] [1hart [mu []
+[stdlib [mu [] [ctrl [mu [] [1hart-table [mu [] [1hart [mu []
 [def (mycondition) [< {zero} {t0}]]
 [[print [block! [branch3
   mycondition
   {lw t1 0(t0)}]]]]
-]]]]]]
+]]]]]]]]

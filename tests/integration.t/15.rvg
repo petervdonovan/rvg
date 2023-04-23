@@ -1,4 +1,4 @@
-[stdlib [mu [] [1hart [mu [] [ctrl [mu []
+[stdlib [mu [] [1hart-table [mu [] [ctrl [mu []
 [def (asm block! [cycles! 6]) [prologue 5]]
 [[println {done computing prologue}]]
 [[print asm]]
