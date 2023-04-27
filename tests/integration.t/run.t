@@ -23,7 +23,7 @@
   [stdlib.rvg] line 10, col 4 to line 12, col 50: Assertion failed
   [3.rvg] line 7, col 9 to line 7, col 17: Assertion failed
   [3.rvg] line 7, col 1 to line 7, col 52: Assertion failed
-  [stdlib.rvg] line 49, col 2 to line 49, col 10: Assertion failed
+  [stdlib.rvg] line 51, col 2 to line 51, col 10: Assertion failed
   [3.rvg] line 1, col 2 to line 8, col 3: Assertion failed
   $ rbu -d -n 4.rvg
   testing lam!
@@ -34,7 +34,7 @@
   [stdlib.rvg] line 10, col 4 to line 12, col 50: Assertion failed
   [4.rvg] line 8, col 6 to line 8, col 42: Assertion failed
   [4.rvg] line 8, col 4 to line 8, col 43: Assertion failed
-  [stdlib.rvg] line 49, col 2 to line 49, col 10: Assertion failed
+  [stdlib.rvg] line 51, col 2 to line 51, col 10: Assertion failed
   [4.rvg] line 1, col 2 to line 9, col 3: Assertion failed
   $ rbu -d -n 5.rvg
   curried successfully
@@ -49,7 +49,7 @@
   [stdlib.rvg] line 19, col 4 to line 21, col 48: Assertion failed
   [6.rvg] line 4, col 28 to line 4, col 32: Assertion failed
   [6.rvg] line 7, col 2 to line 7, col 19: Assertion failed
-  [stdlib.rvg] line 49, col 2 to line 49, col 10: Assertion failed
+  [stdlib.rvg] line 51, col 2 to line 51, col 10: Assertion failed
   [6.rvg] line 1, col 2 to line 8, col 3: Assertion failed
   $ rbu -d -n 7.rvg
   ok nop
@@ -64,7 +64,7 @@
       add t0, t0, t1
       addi t0, t0, 67
   [8.rvg] line 14, col 3 to line 14, col 13: Expected 3 cycles but got 4
-  [stdlib.rvg] line 49, col 2 to line 49, col 10: Expected 3 cycles but got 4
+  [stdlib.rvg] line 51, col 2 to line 51, col 10: Expected 3 cycles but got 4
   [8.rvg] line 1, col 2 to line 15, col 3: Expected 3 cycles but got 4
   $ rbu -d -n 9.rvg
   15
@@ -100,7 +100,7 @@
   [stdlib.rvg] line 19, col 4 to line 21, col 48: Assertion failed
   [14.rvg] line 11, col 39 to line 11, col 42: Assertion failed
   [14.rvg] line 11, col 2 to line 11, col 43: Assertion failed
-  [stdlib.rvg] line 49, col 2 to line 49, col 10: Assertion failed
+  [stdlib.rvg] line 51, col 2 to line 51, col 10: Assertion failed
   [14.rvg] line 1, col 2 to line 12, col 3: Assertion failed
   $ rbu -d -n 15.rvg
   done computing prologue

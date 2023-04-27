@@ -314,7 +314,7 @@ let rec log2 args _ _ _ _ _ r =
   (Ast.Integer (log2rec r 0 1 i), Ast.metaInitial r)
 
 and log2rec r power n i =
-  if n > i then raise (Eval.AssertionFail ((i |> string_of_int) ^ " is not divisible by 2", r))
+  if n > i then raise (Eval.AssertionFail ((i |> string_of_int) ^ " is not a power of 2", r))
   else if n = i then power
   else log2rec r (power + 1) (n * 2) i
 
