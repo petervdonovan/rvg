@@ -300,10 +300,10 @@ let unsafeAssertKCycles args _ _ closure currentEnv _ r =
       (Ast.ParsedAsm (Assembly.FinishedBlock (unsafeAssertKCyclesFb k asmtem')), metadata) )
 
 let binaryMathOp op args _ _ _ _ _ r =
-  assertExactlyNArgs 2 args r ;
-  let arg0, _ = args |> List.hd |> getNumericalArg r in
-  let arg1, _ = List.nth args 1 |> getNumericalArg r in
-  (Ast.Integer (op arg0 arg1), Ast.metaInitial r)
+  assertAtLeastNArgs 1 args r ;
+  let args = args |> List.map (getNumericalArg r) |> List.map fst in
+  let head, tail = List.hd args, List.tl args in
+  (Ast.Integer (tail |> List.fold_left op head), Ast.metaInitial r)
 
 let binaryMathOpMod op args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r ;
