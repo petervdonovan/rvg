@@ -387,7 +387,7 @@ let parseRdcycle env opc e =
       ( Some
           (Instruction
              (Csr
-                {opc= ("csrrs", r'); rd= nameToReg ((rd, r'), env'); rs1= Zero r; imm= ("0xb00", r)}
+                {opc= ("csrrs", r'); rd= nameToReg ((rd, r'), env'); rs1= Zero r; imm= ("cycle", r)}
              ) )
       , e' )
 
