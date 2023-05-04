@@ -39,7 +39,7 @@ module NameSet = Set.Make (String)
 let strsToNameset strs = List.fold_right NameSet.add strs NameSet.empty
 
 let rTypeInstrs : NameSet.t =
-  strsToNameset ["add"; "sub"; "and"; "or"; "xor"; "sll"; "srl"; "sra"; "slt"; "sltu"]
+  strsToNameset ["add"; "sub"; "and"; "or"; "xor"; "sll"; "srl"; "sra"; "slt"; "sltu"; "mul"]
 
 let iTypeInstrs =
   strsToNameset ["addi"; "andi"; "ori"; "xori"; "slli"; "srli"; "srai"; "slti"; "sltiu"]
