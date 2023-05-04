@@ -344,6 +344,7 @@ let foldRange args _ _ closure _ _ r =
   let step, _ = args 0 in
   let start, _ = args 1 in
   let count, _ = args 2 in
+  if count < 0 then raise (Eval.AssertionFail ("Expected a natural number but got " ^ (count |> string_of_int), r)) else
   addattrInternal "range"
     (emptyLam 1 r closure (fun args _ _ closure _ _ r ->
          let initial = List.hd args in
@@ -390,6 +391,8 @@ let stdFun : Ast.lam_function E.t =
   |> E.add "-" (binaryMathOp ( - ))
   |> E.add "/" (binaryMathOp ( / ))
   |> E.add "%" (binaryMathOp ( mod ))
+  |> E.add "min" (binaryMathOp min)
+  |> E.add "max" (binaryMathOp max)
   |> E.add "mod+" (binaryMathOpMod ( + ))
   |> E.add "mod*" (binaryMathOpMod ( * ))
   |> E.add "mod-" (binaryMathOpMod ( - ))
