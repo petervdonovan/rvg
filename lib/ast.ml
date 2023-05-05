@@ -32,7 +32,10 @@ and template = expr list * expr Environment.t
 
 and var = {name: string; checks: (expr * metadata) list}
 
-and lam = {params: (var * metadata) list; lbody: expr list; env: expr Environment.t; f: lam_function}
+and param = PVar of var | Word of string
+
+and lam =
+  {params: (param * metadata) list; lbody: expr list; env: expr Environment.t; f: lam_function}
 
 and lam_application = {lam: expr; args: expr list}
 
@@ -40,7 +43,7 @@ and define = {dname: var * metadata; dvalue: expr list}
 
 and lam_function =
      expr list (*args*)
-  -> (var * metadata) list (*params*)
+  -> (param * metadata) list (*params*)
   -> expr list (*lbody*)
   -> expr Environment.t (*closure*)
   -> expr Environment.t (*current env*)
@@ -85,7 +88,10 @@ and lamMuToString la =
   let {params; lbody; _} = la in
   "Lam(params=["
   ^ List.fold_left ( ^ ) ""
-      (List.map exprToString (List.map (fun v -> (Var v, metaEmpty)) (List.map fst params)))
+      (List.map exprToString
+         ( params |> List.map fst
+         |> List.filter_map (fun p -> match p with PVar p -> Some p | Word _ -> None)
+         |> List.map (fun v -> (Var v, metaEmpty)) ) )
   ^ "], lbody=" ^ sequenceToString lbody ^ ")"
 
 let rangeOf e = (snd e).r
@@ -268,8 +274,8 @@ and parseVarList std startInclusive accumulator stream =
       , metaInitial {startInclusive; endExclusive= CharStream.incrementedCol p}
       , s )
   | Some ('(', s, p) ->
-      let v, s' = parseVar std p s in
-      parseVarList std startInclusive (v :: accumulator) s'
+      let (v, m), s' = parseVar std p s in
+      parseVarList std startInclusive ((PVar v, m) :: accumulator) s'
   | Some (x, _, p) ->
       raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x, p))
   | None ->

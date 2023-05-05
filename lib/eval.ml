@@ -51,7 +51,7 @@ and evalExprRec env e =
           raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e, [Ast.rangeOf e])) )
   | Ast.Def define, meta ->
       let evaluated = (evalSequence meta.r) env define.dvalue in
-      (evaluated, bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
+      (evaluated, bindNames env [Ast.PVar (fst define.dname)] [evaluated] (Ast.rangeOf e))
 
 and evalExprListInOrder env exprList =
   let exprs, env =
@@ -76,15 +76,19 @@ and bindNames env params args r =
   if nparams = nargs then
     List.fold_left2
       (fun env param arg ->
-        let p : Ast.var = param in
-        let arg', env' = applyChecks env p arg in
-        Environment.add p.name arg' env' )
+        match param with
+        | Ast.PVar p ->
+            let arg', env' = applyChecks env p arg in
+            Environment.add p.name arg' env'
+        | Ast.Word _ ->
+            raise (EvalFail ("", [r])) )
       env params args
   else
     raise
       (EvalFail
          ( "Expected " ^ string_of_int nparams ^ " arguments corresponding to parameters "
-           ^ String.concat ", " (List.map (fun (v : Ast.var) -> v.name) params)
+           ^ String.concat ", "
+               (List.map (fun p -> match p with Ast.PVar v -> v.name | Word w -> w) params)
            ^ " but got " ^ string_of_int nargs ^ " arguments: "
            ^ String.concat ", " (List.map Ast.exprToString args)
          , [r] ) )

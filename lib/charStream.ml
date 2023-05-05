@@ -10,8 +10,9 @@ let posToString p =
   "line " ^ string_of_int (p.zeroBasedLine + 1) ^ ", col " ^ string_of_int (p.zeroBasedCol + 1)
 
 let rangeToString r =
-  "[" ^ Filename.basename r.startInclusive.file ^ "] " ^ posToString r.startInclusive ^ " to "
-  ^ posToString r.endExclusive
+  "["
+  ^ Filename.basename r.startInclusive.file
+  ^ "] " ^ posToString r.startInclusive ^ " to " ^ posToString r.endExclusive
 
 let origin file = {zeroBasedLine= 0; zeroBasedCol= 0; file}
 

@@ -194,8 +194,8 @@ let isX predicate args _ _ _ _ _ r =
 let isNum = isX (fun arg -> match arg with Ast.Integer _ -> true | _ -> false)
 
 let pred2 predicate args _ _ _ _ _ r =
-  assertExactlyNArgs 2 args r;
-  let (arg0, _), (arg1, _) = List.nth args 0, List.nth args 1 in
+  assertExactlyNArgs 2 args r ;
+  let (arg0, _), (arg1, _) = (List.nth args 0, List.nth args 1) in
   if predicate arg0 arg1 then (trueLambda, Ast.metaInitial r) else (falseLambda, Ast.metaInitial r)
 
 let isFragment =
@@ -244,13 +244,18 @@ let rec getCycles env r (f : Assembly.finished_block) =
     | None -> (
       match f.content with
       | Assembly.Instruction i -> (
-        let category = i |> Assembly.instrCategory |> (^) "cycles-of-" in
-        match Eval.Environment.find_opt category env with
-        | Some (Ast.Integer k, _) ->
-            k
-        | Some (_, (meta: Ast.metadata)) -> raise (Eval.AssertionFail ("expected integer", meta.r))
-        | None ->
-            raise (Eval.AssertionFail ("could not determine cycles of {" ^ (i |> Assembly.instrToString) ^ "} because " ^ category ^ " is not in the environment.", r)) )
+          let category = i |> Assembly.instrCategory |> ( ^ ) "cycles-of-" in
+          match Eval.Environment.find_opt category env with
+          | Some (Ast.Integer k, _) ->
+              k
+          | Some (_, (meta : Ast.metadata)) ->
+              raise (Eval.AssertionFail ("expected integer", meta.r))
+          | None ->
+              raise
+                (Eval.AssertionFail
+                   ( "could not determine cycles of {" ^ (i |> Assembly.instrToString)
+                     ^ "} because " ^ category ^ " is not in the environment."
+                   , r ) ) )
       | Assembly.MetaBlock mb ->
           List.fold_left ( + ) 0 (List.map (getCycles env r) mb |> List.map snd) )
   in
@@ -302,7 +307,7 @@ let unsafeAssertKCycles args _ _ closure currentEnv _ r =
 let binaryMathOp op args _ _ _ _ _ r =
   assertAtLeastNArgs 1 args r ;
   let args = args |> List.map (getNumericalArg r) |> List.map fst in
-  let head, tail = List.hd args, List.tl args in
+  let head, tail = (List.hd args, List.tl args) in
   (Ast.Integer (tail |> List.fold_left op head), Ast.metaInitial r)
 
 let binaryMathOpMod op args _ _ closure _ _ r =
@@ -344,23 +349,25 @@ let foldRange args _ _ closure _ _ r =
   let step, _ = args 0 in
   let start, _ = args 1 in
   let count, _ = args 2 in
-  if count < 0 then raise (Eval.AssertionFail ("Expected a natural number but got " ^ (count |> string_of_int), r)) else
-  addattrInternal "range"
-    (emptyLam 1 r closure (fun args _ _ closure _ _ r ->
-         let initial = List.hd args in
-         emptyLam 1 r closure (fun args _ _ _ currentEnv _ r ->
-             Seq.fold_left
-               (fun acc next ->
-                 fst
-                   (Eval.evalExpr currentEnv
-                      (Ast.LamApplication {lam= List.hd args; args= [acc; next]}, Ast.metaInitial r) )
-                 )
-               initial
-               ( Seq.unfold
-                   (fun (current, n) ->
-                     if n = count then None else Some (current, (current + step, n + 1)) )
-                   (start, 0)
-               |> Seq.map (fun x -> (Ast.Integer x, Ast.metaInitial r)) ) ) ) )
+  if count < 0 then
+    raise (Eval.AssertionFail ("Expected a natural number but got " ^ (count |> string_of_int), r))
+  else
+    addattrInternal "range"
+      (emptyLam 1 r closure (fun args _ _ closure _ _ r ->
+           let initial = List.hd args in
+           emptyLam 1 r closure (fun args _ _ _ currentEnv _ r ->
+               Seq.fold_left
+                 (fun acc next ->
+                   fst
+                     (Eval.evalExpr currentEnv
+                        ( Ast.LamApplication {lam= List.hd args; args= [acc; next]}
+                        , Ast.metaInitial r ) ) )
+                 initial
+                 ( Seq.unfold
+                     (fun (current, n) ->
+                       if n = count then None else Some (current, (current + step, n + 1)) )
+                     (start, 0)
+                 |> Seq.map (fun x -> (Ast.Integer x, Ast.metaInitial r)) ) ) ) )
 
 let applierifyVarargs args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r ;
@@ -384,7 +391,10 @@ let stdFun : Ast.lam_function E.t =
   |> E.add "unsafe-assert-exact-cycles" unsafeAssertKCycles
   |> E.add "block!" assertBlock |> E.add "addattr" addattr |> E.add "hasattr" hasattr
   |> E.add "lam?" isLam |> E.add "lamof" lamOf |> E.add "num?" isNum |> E.add "frag?" isFragment
-  |> E.add ">?" (pred2 ( > )) |> E.add "<?" (pred2 ( < )) |> E.add "<=?" (pred2 ( <= )) |> E.add ">=?" (pred2 ( >= ))
+  |> E.add ">?" (pred2 ( > ))
+  |> E.add "<?" (pred2 ( < ))
+  |> E.add "<=?" (pred2 ( <= ))
+  |> E.add ">=?" (pred2 ( >= ))
   |> E.add "block?" isFinishedBlock |> E.add "reg?" isReg
   |> E.add "+" (binaryMathOp ( + ))
   |> E.add "*" (binaryMathOp ( * ))
