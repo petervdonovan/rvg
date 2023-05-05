@@ -276,8 +276,10 @@ and parseVarList std startInclusive accumulator stream =
   | Some ('(', s, p) ->
       let (v, m), s' = parseVar std p s in
       parseVarList std startInclusive ((PVar v, m) :: accumulator) s'
-  | Some (x, _, p) ->
-      raise (ParseFail ("Expected ']' or '(', not " ^ String.make 1 x, p))
+  | Some (c, s, p) ->
+      (match CharStream.parseToken (CharStream.cons c s) with
+      | None -> raise (ParseFail ("unreachable", p))
+      | Some (w, s', r) -> parseVarList std startInclusive ((Word w, metaInitial r) :: accumulator) s')
   | None ->
       raise (ParseFail ("Expected ']' or '(', not end-of-file", (stream : CharStream.t).current))
 

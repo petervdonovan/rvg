@@ -8,9 +8,9 @@
   $ dune exec -- ../../bin/main.exe  1-multiple-files/a.rvg 1-multiple-files/b.rvg
   addi zero zero 0
   $ dune exec -- ../../bin/main.exe tokens 0.rvg
+  {"kind": "function", "modifier": "defaultLibrary", "range": { "file": "0.rvg", "range": [[0, 2], [0, 7]] } }
   {"kind": "function", "modifier": "", "range": { "file": "0.rvg", "range": [[3, 5], [3, 6]] } }
   {"kind": "function", "modifier": "", "range": { "file": "0.rvg", "range": [[4, 5], [4, 6]] } }
-  {"kind": "function", "modifier": "defaultLibrary", "range": { "file": "0.rvg", "range": [[0, 2], [0, 7]] } }
   $ rbu -d -n 2.rvg
   a ok
   b ok
@@ -133,3 +133,10 @@
       csrrw zero, 0x51e, t0
       csrrw zero, 0x51e, a0
       jalr zero, ra, 0
+  $ rbu -d -n 20.rvg
+  one
+  two
+  [20.rvg] line 4, col 13 to line 4, col 14: Expected "and", not E(Name(,), )
+  [20.rvg] line 4, col 2 to line 4, col 21: Expected "and", not E(Name(,), )
+  [stdlib.rvg] line 51, col 2 to line 51, col 10: Expected "and", not E(Name(,), )
+  [20.rvg] line 1, col 2 to line 5, col 3: Expected "and", not E(Name(,), )

@@ -1,0 +1,5 @@
+[stdlib [mu []
+[def (test) [lam [(this) and (that)] [[println this]] [[println that]]]]
+[test {one} and {two}]
+[test {one} , {two}]
+]]

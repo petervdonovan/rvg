@@ -42,16 +42,17 @@ and evalExprRec env e =
       if Environment.is_empty prevEnv then ((Ast.Lam {params; lbody; env; f}, meta), env)
       else (e, env)
   | Ast.LamApplication {lam; args}, meta -> (
-      let args', env' = evalExprListInOrder env args in
-      let lam', _ = evalExpr env' lam in
+      let lam', env' = evalExpr env lam in
       match lam' with
       | Lam {params; lbody; env= env''; f}, _ ->
-          (f args' params lbody env'' env' (evalSequence meta.r) meta.r, env')
+          let args' = parseArgs params args in
+          let args'', _ = evalExprListInOrder env' args' in
+          (f args'' params lbody env'' env' (evalSequence meta.r) meta.r, env')
       | e ->
           raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e, [Ast.rangeOf e])) )
   | Ast.Def define, meta ->
       let evaluated = (evalSequence meta.r) env define.dvalue in
-      (evaluated, bindNames env [Ast.PVar (fst define.dname)] [evaluated] (Ast.rangeOf e))
+      (evaluated, bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
 
 and evalExprListInOrder env exprList =
   let exprs, env =
@@ -76,22 +77,29 @@ and bindNames env params args r =
   if nparams = nargs then
     List.fold_left2
       (fun env param arg ->
-        match param with
-        | Ast.PVar p ->
-            let arg', env' = applyChecks env p arg in
-            Environment.add p.name arg' env'
-        | Ast.Word _ ->
-            raise (EvalFail ("", [r])) )
+        let p : Ast.var = param in
+        let arg', env' = applyChecks env p arg in
+        Environment.add p.name arg' env' )
       env params args
   else
     raise
       (EvalFail
-         ( "Expected " ^ string_of_int nparams ^ " arguments corresponding to parameters "
-           ^ String.concat ", "
-               (List.map (fun p -> match p with Ast.PVar v -> v.name | Word w -> w) params)
-           ^ " but got " ^ string_of_int nargs ^ " arguments: "
-           ^ String.concat ", " (List.map Ast.exprToString args)
-         , [r] ) )
+        ( "Expected " ^ string_of_int nparams ^ " arguments corresponding to parameters "
+          ^ String.concat ", " (List.map (fun (v : Ast.var) -> v.name) params)
+          ^ " but got " ^ string_of_int nargs ^ " arguments: "
+          ^ String.concat ", " (List.map Ast.exprToString args)
+        , [r] ) )
+
+and parseArgs params args =
+  if List.length params = 0 then args else
+  let folder = (fun acc param arg ->
+    match param with
+    | Ast.Word w, _ ->
+      (match arg with
+      | Ast.Name a, _ when a = w -> acc
+      | _, m -> raise (EvalFail ("Expected \"" ^ w ^ "\", not " ^ (arg |> Ast.exprToString), [m.r])) )
+    | Ast.PVar _, _ -> arg :: acc) in
+  List.fold_left2 folder [] params args |> List.rev
 
 and applyChecks env (param : Ast.var) arg =
   List.fold_left
@@ -121,12 +129,17 @@ and mergeExprs es =
           e :: acc )
     [] es
 
+let getPVars params =
+  List.map fst params |> List.filter_map (fun p -> match p with | Ast.PVar p' -> Some p' | _ -> None)
+
 let lam args params lbody closure _ evalSequence r =
-  let bound = bindNames closure (List.map fst params) args r in
+  let params' = getPVars params in
+  let bound = bindNames closure params' args r in
   evalSequence bound lbody
 
 let mu args params lbody closure currentEnv evalSequence r =
-  let bound = bindNames currentEnv (List.map fst params) args r in
+  let params' = getPVars params in
+  let bound = bindNames currentEnv params' args r in
   evalSequence (Environment.union (fun _ a _ -> Some a) bound closure) lbody
 
 let testStd = Environment.empty |> Environment.add "lam" lam |> Environment.add "mu" mu
