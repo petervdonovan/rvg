@@ -82,8 +82,8 @@ let emptyLam nargs r closure f =
             f args params lbody closure currentEnv evalSequence r ) }
   , ({attrs= Ast.Attributes.singleton (nargsAttr nargs); r} : Ast.metadata) )
 
-let emptyVarargsLam r closure f =
-  ( Ast.Lam {params= []; lbody= []; env= closure; f}
+let emptyVarargsLam params r closure f =
+  ( Ast.Lam {params; lbody= []; env= closure; f}
   , ({attrs= Ast.Attributes.singleton varargsAttr; r} : Ast.metadata) )
 
 let addattrInternal attr expr =
@@ -97,7 +97,7 @@ let print args _ _ closure _ _ r =
 
 let fail args _ _ closure _ _ r =
   assertAtLeastNArgs 1 args r ;
-  emptyVarargsLam r closure (fun _ _ _ _ _ _ r ->
+  emptyVarargsLam [] r closure (fun _ _ _ _ _ _ r ->
       args |> List.iter errorReportingPrintExpr ;
       raise (Eval.AssertionFail ("Assertion failed", r)) )
 
@@ -370,15 +370,15 @@ let foldRange args _ _ closure _ _ r =
                  |> Seq.map (fun x -> (Ast.Integer x, Ast.metaInitial r)) ) ) ) )
 
 let applierifyVarargs args _ _ closure _ _ r =
-  assertExactlyNArgs 1 args r ;
-  let applyee = List.hd args in
-  emptyVarargsLam r closure (fun varargs _ _ closure' currentEnv _ r' ->
+  assertExactlyNArgs 2 args r ;
+  let nestedApplyee = List.hd args in
+  let applyee = List.nth args 1 in
+  emptyVarargsLam [] r closure (fun varargs _ _ closure' currentEnv _ r' ->
       Eval.evalExpr currentEnv
         ( Ast.LamApplication
             { lam= applyee
             ; args=
-                [ emptyLam 1 r' closure' (fun args _ _ _ _ _ r'' ->
-                      let nestedApplyee = List.hd args in
+                [ emptyLam 0 r' closure' (fun _ _ _ _ _ _ r'' ->
                       Eval.evalExpr currentEnv
                         (Ast.LamApplication {lam= nestedApplyee; args= varargs}, Ast.metaInitial r'')
                       |> fst ) ] }
