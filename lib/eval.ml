@@ -45,7 +45,7 @@ and evalExprRec env e =
       let lam', env' = evalExpr env lam in
       match lam' with
       | Lam {params; lbody; env= env''; f}, _ ->
-          let args' = parseArgs params args in
+          let args' = parseArgs params args meta.r in
           let args'', _ = evalExprListInOrder env' args' in
           (f args'' params lbody env'' env' (evalSequence meta.r) meta.r, env')
       | e ->
@@ -90,9 +90,9 @@ and bindNames env params args r =
           ^ String.concat ", " (List.map Ast.exprToString args)
         , [r] ) )
 
-and parseArgs params args =
+and parseArgs params args r =
   if List.length params = 0 then args else
-  let folder = (fun acc param arg ->
+  try let folder = (fun acc param arg ->
     match param with
     | Ast.Word w, _ ->
       (match arg with
@@ -100,6 +100,8 @@ and parseArgs params args =
       | _, m -> raise (EvalFail ("Expected \"" ^ w ^ "\", not " ^ (arg |> Ast.exprToString), [m.r])) )
     | Ast.PVar _, _ -> arg :: acc) in
   List.fold_left2 folder [] params args |> List.rev
+    with Invalid_argument _ -> raise (EvalFail ("Wrong number of arguments", [r]))
+
 
 and applyChecks env (param : Ast.var) arg =
   List.fold_left

@@ -1,5 +1,6 @@
+[[mu []
+[def (3print) [lam [(x) (y) (z)] [[print x]] [[print y]] [[print z]]]]
 [
-  [applierify-varargs
-    [lam [(applier)]
-      [applier [lam [(x) (y) (z)] [[print x]] [[print y]] [[print z]]]]]]
-  {alphabet} { soup } {bishop}]
+  [applierify-varargs 3print
+    [lam [(applier)] [applier]]]
+  {alphabet} { soup } {bishop}]]]
