@@ -140,3 +140,9 @@
   [20.rvg] line 4, col 2 to line 4, col 21: Expected "and", not E(Name(,), )
   [stdlib.rvg] line 55, col 2 to line 55, col 10: Expected "and", not E(Name(,), )
   [20.rvg] line 1, col 2 to line 5, col 3: Expected "and", not E(Name(,), )
+  $ rbu -d -n 21.rvg
+  [21.rvg] line 6, col 13 to line 6, col 15: error parsing addi: t1 is not a number and is not bound in the environment
+  [21.rvg] line 6, col 2 to line 6, col 6: error parsing addi: t1 is not a number and is not bound in the environment
+  [21.rvg] line 2, col 2 to line 8, col 3: error parsing addi: t1 is not a number and is not bound in the environment
+  [stdlib.rvg] line 55, col 2 to line 55, col 10: error parsing addi: t1 is not a number and is not bound in the environment
+  [21.rvg] line 1, col 2 to line 9, col 3: error parsing addi: t1 is not a number and is not bound in the environment

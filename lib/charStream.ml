@@ -73,7 +73,7 @@ let rec takeWhileRec pred acc r s =
       if pred c then (
         Buffer.add_char acc c ;
         takeWhileRec pred acc {startInclusive= r.startInclusive; endExclusive= s'.current} s' )
-      else (acc, {startInclusive= p; endExclusive= p}, cons c s')
+      else (acc, {startInclusive= r.startInclusive; endExclusive= p}, cons c s')
   | None ->
       (acc, r, s)
 

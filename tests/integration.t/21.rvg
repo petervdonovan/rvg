@@ -1,0 +1,9 @@
+[stdlib [mu []
+[block! {
+addi t0 t0 1 slli
+t0 t0 2
+  mv t2 t3
+ addi t0 t0 t1
+
+}]
+]]

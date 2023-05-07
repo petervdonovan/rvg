@@ -1,5 +1,3 @@
-exception AsmParseFail of string * CharStream.range
-
 open ParseUtil
 open Templates
 open Assembly
@@ -63,11 +61,11 @@ let temporaries =
 let saved = strsToNameset ["s0"; "s1"; "s2"; "s3"; "s4"; "s5"; "s6"; "s7"; "s8"; "s9"; "s10"; "s11"]
 
 let failWithNoBinding name r =
-  raise (AsmParseFail ("Could not find binding for name \"" ^ name ^ "\"", r))
+  raise (Eval.AssertionFail ("Could not find binding for name \"" ^ name ^ "\"", r))
 
 let expectAsm r env name description =
   let badExprType bad =
-    AsmParseFail
+    Eval.AssertionFail
       (description ^ " expected, but found expression " ^ Ast.exprToString bad, (snd bad).r)
   in
   if Eval.Environment.mem name env then
@@ -88,7 +86,7 @@ let expectAsm r env name description =
       | Fragment f ->
           (f, r)
       | _ ->
-          raise (AsmParseFail ("Expected assembly fragment, but got assembly block", r)) )
+          raise (Eval.AssertionFail ("Expected assembly fragment, but got assembly block", r)) )
     | bad ->
         raise (badExprType bad)
   else failWithNoBinding name r
@@ -128,7 +126,7 @@ let rec nameToReg name =
     | Some name', _ ->
         nameToReg name'
     | None, _ ->
-        raise (AsmParseFail ("expected register but got nothing", r))
+        raise (Eval.AssertionFail ("expected register but got nothing", r))
 
 let resolveNumericalImm imm =
   let (s, r), env = imm in
@@ -141,8 +139,8 @@ let resolveNumericalImm imm =
         | (Ast.Integer i, _), _ ->
             (i |> string_of_int, r)
         | e, _ ->
-            raise (AsmParseFail ("expected number, not " ^ (e |> Ast.exprToString), r))
-      else raise (AsmParseFail (s ^ " is not a number and is not bound in the environment", r))
+            raise (Eval.AssertionFail ("expected number, not " ^ (e |> Ast.exprToString), r))
+      else raise (Eval.AssertionFail (s ^ " is not a number and is not bound in the environment", r))
 
 let resolveLabel label =
   let (l, r), env = label in
@@ -152,11 +150,11 @@ let resolveLabel label =
     | Some (l', _), _ ->
         l'
     | None, _ ->
-        raise (AsmParseFail ("expected label but got nothing", r))
+        raise (Eval.AssertionFail ("expected label but got nothing", r))
 
 let asmParseFail formatDescription e r =
   raise
-    (AsmParseFail
+    (Eval.AssertionFail
        ( "Instruction \"" ^ Ast.exprToString e ^ "\" does not follow the instruction syntax for "
          ^ formatDescription
        , r ) )
@@ -267,7 +265,7 @@ let parseJr env opc e =
   | None, _ ->
       (None, Some e)
 
-let parseLa _ opc _ = raise (AsmParseFail ("la is not currently supported", snd opc))
+let parseLa _ opc _ = raise (Eval.AssertionFail ("la is not currently supported", snd opc))
 
 let parseLi env opc e =
   let _, r = opc in
@@ -419,7 +417,7 @@ let tryParse env e =
   match opcode with
   | Some (Asm opcode, meta) ->
       (let pred = NameSet.mem opcode in
-       ( if pred rTypeInstrs then parseR
+       let f = ( if pred rTypeInstrs then parseR
          else if pred iTypeInstrs then parseI
          else if pred loadInstrs then parseLoad
          else if pred storeInstrs then parseStore
@@ -449,7 +447,9 @@ let tryParse env e =
                      , String.uppercase_ascii opcode = opcode ) ) )
            , e' )
          else fun _ _ _ -> (None, Some e) )
-         env (opcode, meta.r) e'' )
+        in
+        try f env (opcode, meta.r) e''
+      with Eval.AssertionFail (s, r) -> raise (Eval.EvalFail ("error parsing " ^ opcode ^ ": " ^ s, [meta.r; r])))
       |> makeFinishedBlock
   | Some (ParsedAsm (FinishedBlock fb), _) ->
       (Some (fb |> renoncify), e')
@@ -473,7 +473,7 @@ and parseRec env e acc =
         acc
     | None, _ ->
         raise
-          (AsmParseFail ("Expected assembly in parse but got " ^ (e |> Ast.exprToString), (snd e).r))
+          (Eval.AssertionFail ("Expected assembly in parse but got " ^ (e |> Ast.exprToString), (snd e).r))
     )
 
 let rec print pasm =
@@ -504,7 +504,7 @@ and stringifyInstruction hierarchicalNoncifications i =
       if n = "" then label else label ^ "_" ^ n
     with Not_found ->
       raise
-        (AsmParseFail
+        (Eval.AssertionFail
            ( "Could not find label " ^ label
              ^ " in the current context, and so could not print the label with the correct nonce"
            , r ) )

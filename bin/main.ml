@@ -36,7 +36,5 @@ let () =
         printMessageRange s r
     | Rvg.Std.WrongNumberOfArgs (s, r) ->
         printMessageRange s r
-    | Rvg.AssemblyParse.AsmParseFail (s, r) ->
-        printMessageRange s r
     | _ ->
         raise e )
