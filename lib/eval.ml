@@ -84,24 +84,29 @@ and bindNames env params args r =
   else
     raise
       (EvalFail
-        ( "Expected " ^ string_of_int nparams ^ " arguments corresponding to parameters "
-          ^ String.concat ", " (List.map (fun (v : Ast.var) -> v.name) params)
-          ^ " but got " ^ string_of_int nargs ^ " arguments: "
-          ^ String.concat ", " (List.map Ast.exprToString args)
-        , [r] ) )
+         ( "Expected " ^ string_of_int nparams ^ " arguments corresponding to parameters "
+           ^ String.concat ", " (List.map (fun (v : Ast.var) -> v.name) params)
+           ^ " but got " ^ string_of_int nargs ^ " arguments: "
+           ^ String.concat ", " (List.map Ast.exprToString args)
+         , [r] ) )
 
 and parseArgs params args r =
-  if List.length params = 0 then args else
-  try let folder = (fun acc param arg ->
-    match param with
-    | Ast.Word w, _ ->
-      (match arg with
-      | Ast.Name a, _ when a = w -> acc
-      | _, m -> raise (EvalFail ("Expected \"" ^ w ^ "\", not " ^ (arg |> Ast.exprToString), [m.r])) )
-    | Ast.PVar _, _ -> arg :: acc) in
-  List.fold_left2 folder [] params args |> List.rev
+  if List.length params = 0 then args
+  else
+    try
+      let folder acc param arg =
+        match param with
+        | Ast.Word w, _ -> (
+          match arg with
+          | Ast.Name a, _ when a = w ->
+              acc
+          | _, m ->
+              raise (EvalFail ("Expected \"" ^ w ^ "\", not " ^ (arg |> Ast.exprToString), [m.r])) )
+        | Ast.PVar _, _ ->
+            arg :: acc
+      in
+      List.fold_left2 folder [] params args |> List.rev
     with Invalid_argument _ -> raise (EvalFail ("Wrong number of arguments", [r]))
-
 
 and applyChecks env (param : Ast.var) arg =
   List.fold_left
@@ -132,7 +137,8 @@ and mergeExprs es =
     [] es
 
 let getPVars params =
-  List.map fst params |> List.filter_map (fun p -> match p with | Ast.PVar p' -> Some p' | _ -> None)
+  List.map fst params
+  |> List.filter_map (fun p -> match p with Ast.PVar p' -> Some p' | _ -> None)
 
 let lam args params lbody closure _ evalSequence r =
   let params' = getPVars params in

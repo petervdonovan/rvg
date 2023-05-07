@@ -417,7 +417,8 @@ let tryParse env e =
   match opcode with
   | Some (Asm opcode, meta) ->
       (let pred = NameSet.mem opcode in
-       let f = ( if pred rTypeInstrs then parseR
+       let f =
+         if pred rTypeInstrs then parseR
          else if pred iTypeInstrs then parseI
          else if pred loadInstrs then parseLoad
          else if pred storeInstrs then parseStore
@@ -446,10 +447,11 @@ let tryParse env e =
                      ( String.sub opcode 0 (String.length opcode - 1)
                      , String.uppercase_ascii opcode = opcode ) ) )
            , e' )
-         else fun _ _ _ -> (None, Some e) )
-        in
-        try f env (opcode, meta.r) e''
-      with Eval.AssertionFail (s, r) -> raise (Eval.EvalFail ("error parsing " ^ opcode ^ ": " ^ s, [meta.r; r])))
+         else fun _ _ _ -> (None, Some e)
+       in
+       try f env (opcode, meta.r) e''
+       with Eval.AssertionFail (s, r) ->
+         raise (Eval.EvalFail ("error parsing " ^ opcode ^ ": " ^ s, [meta.r; r])) )
       |> makeFinishedBlock
   | Some (ParsedAsm (FinishedBlock fb), _) ->
       (Some (fb |> renoncify), e')
@@ -473,8 +475,8 @@ and parseRec env e acc =
         acc
     | None, _ ->
         raise
-          (Eval.AssertionFail ("Expected assembly in parse but got " ^ (e |> Ast.exprToString), (snd e).r))
-    )
+          (Eval.AssertionFail
+             ("Expected assembly in parse but got " ^ (e |> Ast.exprToString), (snd e).r) ) )
 
 let rec print pasm =
   match pasm with

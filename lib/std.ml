@@ -374,17 +374,19 @@ let applierifyVarargs args _ _ closure env _ r =
   let nestedApplyee = List.hd args in
   match nestedApplyee with
   | Lam l, meta ->
-  let applyee = List.nth args 1 in
-  emptyVarargsLam l.params r closure (fun varargs _ _ closure' currentEnv _ r' ->
-      Eval.evalExpr currentEnv
-        ( Ast.LamApplication
-            { lam= applyee
-            ; args=
-                [ emptyLam 0 r' closure' (fun _ _ _ _ _ _ _ ->
-                  l.f varargs l.params l.lbody l.env env (Eval.evalSequence meta.r) meta.r ) ] }
-        , Ast.metaInitial r' )
-      |> fst )
-  | _, meta -> raise (Eval.AssertionFail ("Expected a lam but got " ^ (Ast.exprToString nestedApplyee), meta.r))
+      let applyee = List.nth args 1 in
+      emptyVarargsLam l.params r closure (fun varargs _ _ closure' currentEnv _ r' ->
+          Eval.evalExpr currentEnv
+            ( Ast.LamApplication
+                { lam= applyee
+                ; args=
+                    [ emptyLam 0 r' closure' (fun _ _ _ _ _ _ _ ->
+                          l.f varargs l.params l.lbody l.env env (Eval.evalSequence meta.r) meta.r )
+                    ] }
+            , Ast.metaInitial r' )
+          |> fst )
+  | _, meta ->
+      raise (Eval.AssertionFail ("Expected a lam but got " ^ Ast.exprToString nestedApplyee, meta.r))
 
 let stdFun : Ast.lam_function E.t =
   E.empty |> E.add "lam" Eval.lam |> E.add "mu" Eval.mu |> E.add "print" print |> E.add "fail" fail
