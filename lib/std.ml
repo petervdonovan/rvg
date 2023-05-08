@@ -308,7 +308,9 @@ let binaryMathOp op args _ _ _ _ _ r =
   assertAtLeastNArgs 1 args r ;
   let args = args |> List.map (getNumericalArg r) |> List.map fst in
   let head, tail = (List.hd args, List.tl args) in
+  try
   (Ast.Integer (tail |> List.fold_left op head), Ast.metaInitial r)
+  with Division_by_zero -> raise (Eval.EvalFail ("division by zero", [r]))
 
 let binaryMathOpMod op args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r ;

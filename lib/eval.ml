@@ -106,7 +106,7 @@ and parseArgs params args r =
             arg :: acc
       in
       List.fold_left2 folder [] params args |> List.rev
-    with Invalid_argument _ -> raise (EvalFail ("Wrong number of arguments", [r]))
+    with Invalid_argument _ -> raise (EvalFail ("Wrong number of arguments: expected " ^ (List.length params |> string_of_int) ^ " but got " ^ (List.length args |> string_of_int), [r]))
 
 and applyChecks env (param : Ast.var) arg =
   List.fold_left
