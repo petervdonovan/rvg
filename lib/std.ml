@@ -331,6 +331,14 @@ and log2rec r power n i =
   else if n = i then power
   else log2rec r (power + 1) (n * 2) i
 
+let rec gcd a b =
+  if a < b then gcdrec a b else gcdrec b a
+and gcdrec a b =
+  if a = 0 then b else gcdrec (b - (b / a) * a ) a
+let lcm a b =
+  let gcd = gcd a b in
+  a * b / gcd
+
 let assertNumericalComparisonResult comparator description args _ _ closure _ _ r =
   assertExactlyNArgs 1 args r ;
   let arg0, _ = args |> List.hd |> getNumericalArg r in
@@ -433,6 +441,8 @@ let stdFun : Ast.lam_function E.t =
   |> E.add "mod-" (binaryMathOpMod ( - ))
   |> E.add "mod/" (binaryMathOpMod ( / ))
   |> E.add "log2" log2
+  |> E.add "LCM" (binaryMathOp lcm)
+  |> E.add "GCD" (binaryMathOp gcd)
   |> E.add "=!" (assertNumericalComparisonResult ( = ) "exactly")
   |> E.add "<!" (assertNumericalComparisonResult ( < ) "less than")
   |> E.add "<=!" (assertNumericalComparisonResult ( <= ) "less than or equal to")
