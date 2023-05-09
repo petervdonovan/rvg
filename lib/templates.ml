@@ -22,7 +22,7 @@ let rec startsWithWord e =
   let e', _ = e in
   match e' with
   | Template tem ->
-      let (exprs, _) = Eval.fullyEvalTem tem in
+      let exprs, _ = Eval.fullyEvalTem tem in
       if List.length exprs = 0 then true else startsWithWord (List.hd exprs)
   | Asm s ->
       if s = "" then false
@@ -35,7 +35,7 @@ let rec parseToken e =
   let e', meta = e in
   match e' with
   | Template tem -> (
-      let (exprs, env) = Eval.fullyEvalTem tem in
+      let exprs, env = Eval.fullyEvalTem tem in
       if List.length exprs = 0 then (None, Some env, None)
       else
         let token, env', remainder = exprs |> List.hd |> parseToken in

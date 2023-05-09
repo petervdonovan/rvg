@@ -73,9 +73,8 @@ let expectAsm r env name description =
     match e with
     | Ast.Integer i, meta ->
         (string_of_int i, meta.r)
-    | Ast.Template tem, meta ->
-      (
-      match Ast.unwrap (Ast.Template(tem |> Eval.fullyEvalTem)) with
+    | Ast.Template tem, meta -> (
+      match Ast.unwrap (Ast.Template (tem |> Eval.fullyEvalTem)) with
       | Some good ->
           (good, meta.r)
       | None ->

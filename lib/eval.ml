@@ -32,9 +32,7 @@ and evalExprRec env e =
   | Ast.Asm _, _ ->
       (e, env)
   | Ast.Template (tem, prevEnv), meta ->
-      let tem =
-        (Ast.Template (tem, if Environment.is_empty prevEnv then env else prevEnv), meta)
-      in
+      let tem = (Ast.Template (tem, if Environment.is_empty prevEnv then env else prevEnv), meta) in
       (tem, env)
   | Ast.Lam {params; lbody; env= prevEnv; f}, meta ->
       if Environment.is_empty prevEnv then ((Ast.Lam {params; lbody; env; f}, meta), env)
@@ -50,7 +48,8 @@ and evalExprRec env e =
           raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e, [Ast.rangeOf e])) )
   | Ast.Def define, meta ->
       let evaluated = (evalSequence meta.r) env define.dvalue in
-      ((Ast.Template ([], Environment.empty), snd evaluated), bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
+      ( (Ast.Template ([], Environment.empty), snd evaluated)
+      , bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e) )
 
 and evalExprListInOrder env exprList =
   let exprs, env =
@@ -104,7 +103,14 @@ and parseArgs params args r =
             arg :: acc
       in
       List.fold_left2 folder [] params args |> List.rev
-    with Invalid_argument _ -> raise (EvalFail ("Wrong number of arguments: expected " ^ (List.length params |> string_of_int) ^ " but got " ^ (List.length args |> string_of_int), [r]))
+    with Invalid_argument _ ->
+      raise
+        (EvalFail
+           ( "Wrong number of arguments: expected "
+             ^ (List.length params |> string_of_int)
+             ^ " but got "
+             ^ (List.length args |> string_of_int)
+           , [r] ) )
 
 and applyChecks env (param : Ast.var) arg =
   List.fold_left
@@ -135,10 +141,10 @@ and mergeExprs es =
     [] es
 
 let fullyEvalTem template =
-  let (tem, closure) = template in
+  let tem, closure = template in
   let exprs', env' = evalExprListInOrder closure (List.rev tem) in
   let exprs' = mergeExprs exprs' in
-  exprs', env'
+  (exprs', env')
 
 let getPVars params =
   List.map fst params

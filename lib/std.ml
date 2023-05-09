@@ -9,7 +9,7 @@ let rec unconditionalPrint arg =
   | Ast.ParsedAsm pasm, _ ->
       AssemblyParse.print pasm
   | Ast.Template tem, _ ->
-      let tem' = (tem |> Eval.fullyEvalTem |> fst) in
+      let tem' = tem |> Eval.fullyEvalTem |> fst in
       List.iter (fun x -> unconditionalPrint x |> ignore) tem'
   | Ast.Asm asm, _ ->
       print_string asm
@@ -309,8 +309,7 @@ let binaryMathOp op args _ _ _ _ _ r =
   assertAtLeastNArgs 1 args r ;
   let args = args |> List.map (getNumericalArg r) |> List.map fst in
   let head, tail = (List.hd args, List.tl args) in
-  try
-  (Ast.Integer (tail |> List.fold_left op head), Ast.metaInitial r)
+  try (Ast.Integer (tail |> List.fold_left op head), Ast.metaInitial r)
   with Division_by_zero -> raise (Eval.EvalFail ("division by zero", [r]))
 
 let binaryMathOpMod op args _ _ closure _ _ r =
@@ -331,10 +330,10 @@ and log2rec r power n i =
   else if n = i then power
   else log2rec r (power + 1) (n * 2) i
 
-let rec gcd a b =
-  if a < b then gcdrec a b else gcdrec b a
-and gcdrec a b =
-  if a = 0 then b else gcdrec (b - (b / a) * a ) a
+let rec gcd a b = if a < b then gcdrec a b else gcdrec b a
+
+and gcdrec a b = if a = 0 then b else gcdrec (b - (b / a * a)) a
+
 let lcm a b =
   let gcd = gcd a b in
   a * b / gcd
@@ -398,25 +397,32 @@ let applierifyVarargs args _ _ closure env _ r =
           |> fst )
   | _, meta ->
       raise (Eval.AssertionFail ("Expected a lam but got " ^ Ast.exprToString nestedApplyee, meta.r))
+
 let getName r tem =
   match tem with
-  | Ast.Template ([Ast.Asm a, _], _), _ -> Ast.PVar {name=a; checks=[]}, Ast.metaInitial r
-  | _ -> raise (Eval.AssertionFail ("expected a name", r))
+  | Ast.Template ([(Ast.Asm a, _)], _), _ ->
+      (Ast.PVar {name= a; checks= []}, Ast.metaInitial r)
+  | _ ->
+      raise (Eval.AssertionFail ("expected a name", r))
+
 let lamify args _ _ _ env _ r =
-  assertAtLeastNArgs 1 args r;
+  assertAtLeastNArgs 1 args r ;
   let lbody = [List.hd args] in
   let parameterize params' args lbody =
     match lbody with
-  | Ast.Template (exprs, env), meta ->
-    let bound = Eval.bindNames env params' args r in
-    Ast.Template (exprs, bound), meta
-  | _ -> lbody in
+    | Ast.Template (exprs, env), meta ->
+        let bound = Eval.bindNames env params' args r in
+        (Ast.Template (exprs, bound), meta)
+    | _ ->
+        lbody
+  in
   let f args params lbody closure _ evalSequence _ =
     let params' = Eval.getPVars params in
     let lbody' = List.map (parameterize params' args) lbody in
-    evalSequence closure lbody' in
+    evalSequence closure lbody'
+  in
   let params = List.tl args |> List.map (getName r) in
-  Ast.Lam {params; lbody; env; f}, Ast.metaInitial r
+  (Ast.Lam {params; lbody; env; f}, Ast.metaInitial r)
 
 let stdFun : Ast.lam_function E.t =
   E.empty |> E.add "lam" Eval.lam |> E.add "mu" Eval.mu |> E.add "print" print |> E.add "fail" fail
