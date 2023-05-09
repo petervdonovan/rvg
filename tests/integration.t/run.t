@@ -9,8 +9,6 @@
   addi zero zero 0
   $ dune exec -- ../../bin/main.exe tokens 0.rvg
   {"kind": "function", "modifier": "defaultLibrary", "range": { "file": "0.rvg", "range": [[0, 2], [0, 7]] } }
-  {"kind": "function", "modifier": "", "range": { "file": "0.rvg", "range": [[3, 5], [3, 6]] } }
-  {"kind": "function", "modifier": "", "range": { "file": "0.rvg", "range": [[4, 5], [4, 6]] } }
   $ rbu -d -n 2.rvg
   a ok
   b ok
@@ -147,3 +145,5 @@
   [stdlib.rvg] line 55, col 2 to line 55, col 10: error parsing addi: t1 is not a number and is not bound in the environment
   [21.rvg] line 1, col 2 to line 9, col 3: error parsing addi: t1 is not a number and is not bound in the environment
   $ rbu -d -n 22.rvg
+      addi t0, t0, 99
+      slli t0, t0, 19
