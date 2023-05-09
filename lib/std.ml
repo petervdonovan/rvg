@@ -8,8 +8,9 @@ let rec unconditionalPrint arg =
   match arg with
   | Ast.ParsedAsm pasm, _ ->
       AssemblyParse.print pasm
-  | Ast.Template (tem, _), _ ->
-      List.iter (fun x -> unconditionalPrint x |> ignore) tem
+  | Ast.Template tem, _ ->
+      let tem' = (tem |> Eval.fullyEvalTem |> fst) in
+      List.iter (fun x -> unconditionalPrint x |> ignore) tem'
   | Ast.Asm asm, _ ->
       print_string asm
   | Ast.Integer i, _ ->
@@ -389,6 +390,25 @@ let applierifyVarargs args _ _ closure env _ r =
           |> fst )
   | _, meta ->
       raise (Eval.AssertionFail ("Expected a lam but got " ^ Ast.exprToString nestedApplyee, meta.r))
+let getName r tem =
+  match tem with
+  | Ast.Template ([Ast.Asm a, _], _), _ -> Ast.PVar {name=a; checks=[]}, Ast.metaInitial r
+  | _ -> raise (Eval.AssertionFail ("expected a name", r))
+let lamify args _ _ _ env _ r =
+  assertAtLeastNArgs 1 args r;
+  let lbody = [List.hd args] in
+  let parameterize params' args lbody =
+    match lbody with
+  | Ast.Template (exprs, env), meta ->
+    let bound = Eval.bindNames env params' args r in
+    Ast.Template (exprs, bound), meta
+  | _ -> lbody in
+  let f args params lbody closure _ evalSequence _ =
+    let params' = Eval.getPVars params in
+    let lbody' = List.map (parameterize params' args) lbody in
+    evalSequence closure lbody' in
+  let params = List.tl args |> List.map (getName r) in
+  Ast.Lam {params; lbody; env; f}, Ast.metaInitial r
 
 let stdFun : Ast.lam_function E.t =
   E.empty |> E.add "lam" Eval.lam |> E.add "mu" Eval.mu |> E.add "print" print |> E.add "fail" fail
@@ -420,6 +440,7 @@ let stdFun : Ast.lam_function E.t =
   |> E.add ">=!" (assertNumericalComparisonResult ( >= ) "greater than or equal to")
   |> E.add "fold-range" foldRange
   |> E.add "applierify-varargs" applierifyVarargs
+  |> E.add "lamify" lamify
 
 let std =
   E.map

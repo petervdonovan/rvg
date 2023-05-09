@@ -32,12 +32,10 @@ and evalExprRec env e =
   | Ast.Asm _, _ ->
       (e, env)
   | Ast.Template (tem, prevEnv), meta ->
-      let exprs', env' = evalExprListInOrder env (List.rev tem) in
-      let exprs' = mergeExprs exprs' in
       let tem =
-        (Ast.Template (exprs', if Environment.is_empty prevEnv then env else prevEnv), meta)
+        (Ast.Template (tem, if Environment.is_empty prevEnv then env else prevEnv), meta)
       in
-      (tem, env')
+      (tem, env)
   | Ast.Lam {params; lbody; env= prevEnv; f}, meta ->
       if Environment.is_empty prevEnv then ((Ast.Lam {params; lbody; env; f}, meta), env)
       else (e, env)
@@ -135,6 +133,12 @@ and mergeExprs es =
       | _ ->
           e :: acc )
     [] es
+
+let fullyEvalTem template =
+  let (tem, closure) = template in
+  let exprs', env' = evalExprListInOrder closure (List.rev tem) in
+  let exprs' = mergeExprs exprs' in
+  exprs', env'
 
 let getPVars params =
   List.map fst params

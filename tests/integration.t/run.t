@@ -146,3 +146,4 @@
   [21.rvg] line 2, col 2 to line 8, col 3: error parsing addi: t1 is not a number and is not bound in the environment
   [stdlib.rvg] line 55, col 2 to line 55, col 10: error parsing addi: t1 is not a number and is not bound in the environment
   [21.rvg] line 1, col 2 to line 9, col 3: error parsing addi: t1 is not a number and is not bound in the environment
+  $ rbu -d -n 22.rvg

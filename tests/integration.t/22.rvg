@@ -1,0 +1,10 @@
+[stdlib [mu []
+[def (funny)
+  [lam [do (block) with (name)]
+    [lamify block name]]]
+[def (blam! [-> [-> [-> block!]]]) [lam [(name)] [lam [(block)] [lamify block name]]]]
+[def (wacky block!) [[funny do {addi t0 t0 parameter} with {parameter}] 99]]
+[[print wacky]]
+[def (wonky [blam! {yum}]) {slli t0 t0 yum}]
+[[print [wonky 19]]]
+]]
