@@ -52,7 +52,7 @@ and evalExprRec env e =
           raise (EvalFail ("Expected Lam but got " ^ Ast.exprToString e, [Ast.rangeOf e])) )
   | Ast.Def define, meta ->
       let evaluated = (evalSequence meta.r) env define.dvalue in
-      (evaluated, bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
+      ((Ast.Template ([], Environment.empty), snd evaluated), bindNames env [fst define.dname] [evaluated] (Ast.rangeOf e))
 
 and evalExprListInOrder env exprList =
   let exprs, env =
