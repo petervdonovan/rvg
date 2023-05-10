@@ -42,7 +42,7 @@ let getNumericalArg r arg =
       (i, meta)
   | _ ->
       raise
-        (IllegalArgument
+        (Eval.AssertionFail
            ( "Expected numerical arg, but got expression \"" ^ Ast.exprToString arg
              ^ "\"of the wrong type"
            , r ) )
