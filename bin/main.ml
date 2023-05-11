@@ -17,6 +17,7 @@ let evaluate env fname =
   else evalFile env fname
 
 let printMessageRange s r = print_endline (Rvg.CharStream.rangeToString r ^ ": " ^ s)
+let printRange r = print_endline (Rvg.CharStream.rangeToString r)
 
 let () =
   try
@@ -31,7 +32,8 @@ let () =
     | Rvg.Ast.ParseFail (s, (p : Rvg.CharStream.position)) ->
         printMessageRange s {startInclusive= p; endExclusive= p}
     | Rvg.Eval.EvalFail (s, r) ->
-        r |> List.rev |> List.iter (printMessageRange s)
+        print_endline s;
+        r |> List.rev |> List.iter printRange
     | Rvg.Std.IllegalArgument (s, r) ->
         printMessageRange s r
     | Rvg.Std.WrongNumberOfArgs (s, r) ->
