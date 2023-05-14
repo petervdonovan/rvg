@@ -134,16 +134,16 @@ let isLam args _ _ closure _ _ r =
       | _ ->
           (falseLambda, meta) )
 
-let lamOf paramChecks _ _ closure _ _ r =
+let lamOf paramChecks _ _ closure _ _ r' =
   List.iter
     (fun e ->
       match e with
       | Ast.Lam _, _ ->
           ()
       | _ ->
-          raise (Eval.AssertionFail ("Expected lam but got " ^ Ast.exprToString e, r)) )
+          raise (Eval.AssertionFail ("Expected lam but got " ^ Ast.exprToString e, r')) )
     paramChecks ;
-  emptyLam 1 r closure (fun args _ _ _ _ _ r ->
+  emptyLam 1 r' closure (fun args _ _ _ _ _ r ->
       let checkee = List.hd args in
       match checkee with
       | Lam (l : Ast.lam), meta ->
@@ -170,7 +170,7 @@ let lamOf paramChecks _ _ closure _ _ r =
                            ( "Wrong number of args: expected " ^ (nParams |> string_of_int)
                              ^ " but got " ^ (nargs |> string_of_int) ^ " in "
                              ^ (checkee |> Ast.exprToString)
-                           , r ) ) ;
+                           , r' ) ) ;
                     let args' =
                       List.map2
                         (fun paramCheck arg ->
